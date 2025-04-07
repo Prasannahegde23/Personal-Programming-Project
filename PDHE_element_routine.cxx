@@ -82,7 +82,6 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         double neigh_x = currentCoord[3*neighborID];
         double neigh_y = currentCoord[3*neighborID + 1];
         double neigh_z = currentCoord[3*neighborID + 2];
-
         std::vector<double> disp_center(3);
         std::vector<double> disp_j(3);
         disp_center[0] = displacement[3*nodeID];
@@ -105,17 +104,14 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         PD_force_i_j[2] = out.PDforce_z;
         b_d[n] = out.bondVal;
 
-        for(int k=0; k<3; k++)
-        {
-            PD_force_i[k] = PD_force_i[k] + PD_force_i_j[k];
-        }
-
+        PD_force_i[0] = PD_force_i[0] + PD_force_i_j[0];
+        PD_force_i[1] = PD_force_i[1] + PD_force_i_j[1];
+        PD_force_i[2] = PD_force_i[2] + PD_force_i_j[2];
+        
         damage_val = damage_val + (b_d[n] * neighborVolume);
         Volume_j = Volume_j + neighborVolume;
     }
-    cout << "PD_force[0] in element routine returning value: " << PD_force_i[0] << endl;
-    cout << "PD_force[1] in element routine returning value: " << PD_force_i[0] << endl;
-    cout << "PD_force[2] in element routine returning value: " << PD_force_i[2] << endl;
+
     result.Px = PD_force_i[0];
     result.Py = PD_force_i[1];
     result.Pz = PD_force_i[2];
