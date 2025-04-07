@@ -272,7 +272,7 @@ void PDHE::computeForce(const double dt,
           P[3*nodeID + 2] = Pz /*+ body_force[nodeID + 2]*/;
           outFile << "P[3*nodeID]: "<< P[3*nodeID] << endl;
           outFile << "P[3*nodeID + 1]: "<< P[3*nodeID + 1] << endl;
-          outFile << "P[3*nodeID + 2]: "<< P[3*nodeID + 2] << endl;
+          outFile << "P[3*nodeID + 2]: "<< P[3*nodeID + 2] << endl; 
           outFile << "damage[nodeID]: "<< damage[nodeID] << endl;
 
           // Adavptive dynamic relaxtaion method
