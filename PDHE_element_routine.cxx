@@ -7,16 +7,7 @@
 
 using namespace std;
 
-double computeDistance(double point_i[3], double point_j[3]) 
-{
-    double distance = sqrt((point_i[0] - point_j[0]) * (point_i[0] - point_j[0]) +
-                    (point_i[1] - point_j[1]) * (point_i[1] - point_j[1]) +
-                    (point_i[2] - point_j[2]) * (point_i[2] - point_j[2]));
-
-    return distance;
-}
-
-std::vector<double> eta_vec(std::vector<double> disp_of_center, std::vector<double> disp_of_j) 
+std::vector<double> eta_vec(std::vector<double> &disp_of_center, std::vector<double> &disp_of_j) 
 {
     std::vector<double> result(3);
     for(int i=0; i<3; i++)

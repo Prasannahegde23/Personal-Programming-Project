@@ -16,7 +16,7 @@ PDParameter surface_correction(double k_n, double k_t, double m_horizon, double 
     return result; // returning corrected PD parameter
 }
 
-std::vector<double> volume_correction(std::vector<double> PD_force, double m_horizon, double mag_xi, double m_min_grid_spacing, double nodeID, double neighborID)
+std::vector<double> volume_correction(std::vector<double> &PD_force, double m_horizon, double mag_xi, double m_min_grid_spacing, double nodeID, double neighborID)
 {   
     // Should be implemented for all material points in the horizon
     double vol_corr_factor;
