@@ -1,0 +1,96 @@
+Peridigm:
+
+  Verbose: false
+
+  Discretization:
+    Type: "Text File"
+    Input Mesh File: "rectangular_part.txt"
+
+  Materials:
+    My Material:
+      Material Model: "PDHE"
+      Young's Modulus: 270.0
+      Grain boundary diffusion coefficient: 0.84e-9
+      Saturated value of hydrogen concentration: 2.65e-5
+      Critical energy release rate: 2700.0
+      Density: 8.0
+      Poisson's ratio: 0.29
+      No. of load steps: 5
+      No. of steps for hydrogen concentration: 10
+      Thickness: 5.0
+      Minimum grid spacing: 0.3
+
+  Blocks:
+    My Block:
+      Block Names: "block_1"
+      Material: "My Material"
+      Horizon: 3.0
+
+  Initial Conditions:
+    Node Set One: "nodeset_top.txt"
+    Node Set Two: "nodeset_bottom.txt"
+    Initial Concentration:
+      Type: Prescribed Temperature
+      Node Set: "Node Set Two"
+      Value: 0
+
+  Boundary Conditions:
+    Node Set One: "nodeset_top.txt"
+    Node Set Two: "nodeset_bottom.txt"
+
+    Hydrogen Concentration on Surface:
+      Type: "Prescribed Temperature"
+      Node Set: "Node Set Two"
+      Value: 8.9839
+
+    Fix X Bottom:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set Two"
+      Coordinate: "x"
+      Value: "0.0"
+
+    Moving Y Bottom:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set Two"
+      Coordinate: "y"
+      Value: "0.02*1000*t"
+
+    Fix Z Bottom:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set Two"
+      Coordinate: "z"
+      Value: "0.0"
+
+    Fix X Top:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set One"
+      Coordinate: "x"
+      Value: "0.0"
+
+    Moving Y Top:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set One"
+      Coordinate: "y"
+      Value: "-0.02*1000*t"
+
+    Fix Z Top:
+      Type: "Prescribed Displacement"
+      Node Set: "Node Set One"
+      Coordinate: "z"
+      Value: "0.0"
+
+  Solver:
+    Verbose: false
+    Initial Time: 0.0
+    Final Time: 1000.0
+    QuasiStatic:
+      Number of Load Steps: 1
+      Absolute Tolerance: 1.0
+      Maximum Solver Iterations: 10
+
+  Output:
+    Output File Type: "ExodusII"
+    Output Filename: "rectangular_part"
+    Output Frequency: 1
+    Output Variables:
+        Displacement: true
