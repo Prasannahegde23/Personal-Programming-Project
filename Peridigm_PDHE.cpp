@@ -161,6 +161,7 @@ void PDHE::computeForce(const double dt,
   {
     double *modelCoord = nullptr; 
     double *currentCoord = nullptr;
+    double *oldCoord = nullptr;
     double *volume = nullptr; 
     double *concentration = nullptr;
     double *damage = nullptr;
@@ -173,6 +174,7 @@ void PDHE::computeForce(const double dt,
     dataManager.getData(m_volumeFieldId,           PeridigmField::STEP_NONE)->ExtractView(&volume);
     dataManager.getData(m_concentrationFieldId,    PeridigmField::STEP_NP1)->ExtractView(&concentration);
     dataManager.getData(m_damageFieldId, PeridigmField::STEP_NP1)->ExtractView(&damage);
+    dataManager.getData(m_coordinatesFieldId, PeridigmField::STEP_N)->ExtractView(&oldCoord);
     //dataManager.getData(m_displacementFieldID, PeridigmField::STEP_NP1)->ExtractView(&displacement);
 
 
@@ -238,6 +240,11 @@ void PDHE::computeForce(const double dt,
           for(int iID=0; iID < numOwnedPoints; ++iID)
           {
             int nodeID = ownedIDs[iID];
+
+            currentCoord[3*nodeID] = oldCoord[3*nodeID];
+            currentCoord[3*nodeID + 1] = oldCoord[3*nodeID + 1];
+            currentCoord[3*nodeID + 2] = oldCoord[3*nodeID + 2];
+
             double x = currentCoord[3*nodeID]; // x
             double y = currentCoord[3*nodeID + 1]; // y
             double z = currentCoord[3*nodeID + 2]; // z
@@ -261,6 +268,11 @@ void PDHE::computeForce(const double dt,
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
           int nodeID = ownedIDs[iID];
+
+          currentCoord[3*nodeID] = oldCoord[3*nodeID];
+          currentCoord[3*nodeID + 1] = oldCoord[3*nodeID + 1];
+          currentCoord[3*nodeID + 2] = oldCoord[3*nodeID + 2];
+          
           double Px; double Py; double Pz;
           double x = currentCoord[3*nodeID]; // x
           double y = currentCoord[3*nodeID + 1]; // y
@@ -325,12 +337,10 @@ void PDHE::computeForce(const double dt,
 
         }
 
-        outFile << "denominator: "<< denominator << endl;
-        outFile << "numerator: "<< numerator << endl;
-
-        double c_n = 2 * sqrt(numerator/denominator);
-        if(c_n > 2.0)
-          {c_n = 1.9;}
+        double c_n;
+        c_n = 2 * sqrt(numerator/denominator);
+        if(numerator <= 0.0 || c_n > 2.0)
+        {c_n = 1.9;}
 
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
@@ -342,25 +352,22 @@ void PDHE::computeForce(const double dt,
           U_dot_n_plus_half[3*nodeID + 2] = (((2 - (time_step_size_CDM * c_n)) * U_dot_half[3*nodeID + 2]) +
                            (2*time_step_size_CDM * M_inverse[3*nodeID + 2] * P[3*nodeID + 2]))/(2 + (time_step_size_CDM*c_n));
 
-          outFile << "U_dot_n_plus_half[3*nodeID]: "<< U_dot_n_plus_half[3*nodeID] << endl;
-          outFile << "U_dot_n_plus_half[3*nodeID + 1]: "<< U_dot_n_plus_half[3*nodeID + 1] << endl;
-          outFile << "U_dot_n_plus_half[3*nodeID + 2]: "<< U_dot_n_plus_half[3*nodeID + 2] << endl;
           displacement[3*nodeID] = displacement[3*nodeID] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID]);
           displacement[3*nodeID + 1] = displacement[3*nodeID + 1] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID + 1]);
           displacement[3*nodeID + 2] = displacement[3*nodeID + 2] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID + 2]);
-          outFile << "After displacement[3*nodeID]: "<< displacement[3*nodeID] << endl;
-          outFile << "After displacement[3*nodeID + 1]: "<< displacement[3*nodeID + 1] << endl;
-          outFile << "After displacement[3*nodeID + 2]: "<< displacement[3*nodeID + 2] << endl;
 
           currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[3*nodeID];
           currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[3*nodeID + 1];
           currentCoord[3*nodeID + 2] = currentCoord[3*nodeID + 2] + displacement[3*nodeID + 2];
 
+          oldCoord[3*nodeID] = currentCoord[3*nodeID];
+          oldCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1];
+          oldCoord[3*nodeID + 2] = currentCoord[3*nodeID + 2];
+
           double x = currentCoord[3*nodeID]; // x
           double y = currentCoord[3*nodeID + 1]; // y
-          double z = currentCoord[3*nodeID + 2]; // z
-          //outFile << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
-          cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
+          outFile << x << " " << y << " " << displacement[3*nodeID + 1] << endl; // if required damage value
+          //cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
         }
         outFile << endl << endl;
       }

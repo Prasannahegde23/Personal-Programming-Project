@@ -9,7 +9,7 @@ namespace PeridigmNS {
   class PDHE : public PeridigmNS::Material 
   {
   public:
-    // Constructor s 
+    // Constructor s
     PDHE(const Teuchos::ParameterList& params);
 
     // Destructor
@@ -65,7 +65,7 @@ namespace PeridigmNS {
     int m_volumeFieldId;             // per-node volume
     int m_concentrationFieldId;      // Used for hydrogen concentration
     int m_damageFieldId;             // Used to store Damage value
-    int m_displacementFieldID;       // Used to store Displacment value
+    //int m_displacementFieldID;       // Used to store Displacment value
     int m_bodyForceFieldId;       // Used to store Body force value
 
     // We keep a list of all field IDs so Peridigm knows what we use
