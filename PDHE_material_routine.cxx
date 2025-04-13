@@ -15,9 +15,7 @@ std::vector<double> addVectors(std::vector<double> &a, std::vector<double> &b)
 {
     std::vector<double> result(3);
     for(int i=0; i<3; i++) 
-    {
-        result[i] = a[i] + b[i];
-    }
+    {result[i] = a[i] + b[i];}
     return result;
 }
 
@@ -48,9 +46,7 @@ PDOutputs material_routine_PD(double c, double m_horizon, double k_n, double k_t
    std::vector<double> PD_force(3);
 
     for(int i=0; i<3; i++)
-    {
-        PD_force[i] = (kn * eta_n[i]) + (kt * eta_t[i]);
-    }
+    {PD_force[i] = (kn * eta_n[i]) + (kt * eta_t[i]);}
 
     std::vector<double> result(3);
     result = addVectors(xi, eta);
@@ -62,12 +58,21 @@ PDOutputs material_routine_PD(double c, double m_horizon, double k_n, double k_t
     double Phi_i =  concentration_nodeID/m_Sat_Val_Hyd_Conc; // Hydrogen coverage of i
     double Phi_j =  concentration_neighborID/m_Sat_Val_Hyd_Conc; // Hydrogen coverage of j
     double Phi = 0.5 * (Phi_i + Phi_j);
+
     s_c0 = s_c0 * (1 - (1.0467*Phi) + (0.16874*pow(Phi,2)));
+
     // Scalar factor b_d which determines bond breakage
     if (s < s_c0){b_d[n] = 1.0;}
-    if ((s > s_c0) && (s == s_c0)) {b_d[n] = 0.0;}
+    else {b_d[n] = 0.0;}
 
-    PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing, nodeID, neighborID);
+    if(b_d[n] == 0.0)
+    {
+        for(int i=0; i<3; i++)
+        { PD_force[i] = 0.0;}
+    }
+
+    else
+    {PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing, nodeID, neighborID);}
 
     PDOutputs out;
 

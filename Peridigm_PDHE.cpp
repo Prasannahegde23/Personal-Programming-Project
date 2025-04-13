@@ -184,24 +184,15 @@ void PDHE::computeForce(const double dt,
 
     ofstream outFile(outputPath, std::ios::out | std::ios::app);
     //ofstream outFile(outputPath);
-    /*
-    cout << "Youngs Modulus: " << m_Youngs_Modulus << endl ;
-    cout << "Grain boundary diffusion coefficient: " << m_GB_Diff_Coeff << endl;
-    cout << "Saturated value of hydrogen concentration: " << m_Sat_Val_Hyd_Conc << endl;
-    cout << "Critical energy release rate: " << m_Critic_Energy_Rel_Rate << endl;
-    cout << "Density: " << m_density << endl;
-    cout << "Horizon: " << m_horizon << endl;
-    cout << "No. of load steps: " << N_t << endl;
-    cout << "No. of steps for hydrogen concentration: " << N_h << endl;
-    cout << "Thickness: " << m_h << endl;
-    cout << "Minimum grid spacing: " << m_min_grid_spacing << endl << endl; */
 
     double dh = (6 * m_GB_Diff_Coeff)/(M_PI * m_h * (pow(m_horizon,3))); // PD bond constant
     double c = (6 * m_Youngs_Modulus)/(M_PI*pow(m_horizon,4)*(1 - (2*m_poissons_ratio))); // PD parameter
 
     // Time steps size decleration
-    double time_step_size_CDM = (sqrt(m_density * m_Youngs_Modulus)) * 0.7 * m_min_grid_spacing;
-    double time_step_size_EFM = (sqrt(m_density * m_Youngs_Modulus)) * 0.5 * m_min_grid_spacing;
+    //double time_step_size_CDM = (sqrt(m_density * m_Youngs_Modulus)) * 0.7 * m_min_grid_spacing;
+    //double time_step_size_EFM = (sqrt(m_density * m_Youngs_Modulus)) * 0.5 * m_min_grid_spacing;
+    double time_step_size_CDM = 1.0;
+    double time_step_size_EFM = 1.0;
     
     // Other variables decleration
     double m_ii = (M_PI * m_horizon * m_horizon * m_h * c)*(time_step_size_CDM * time_step_size_CDM)/(20 * m_min_grid_spacing);
@@ -210,11 +201,11 @@ void PDHE::computeForce(const double dt,
     std::vector<double> M(3*numOwnedPoints);
     std::vector<double> P(3*numOwnedPoints);
     std::vector<double> M_inverse(3*numOwnedPoints);
-    std::vector<double> K(3*numOwnedPoints);
+    //std::vector<double> K(3*numOwnedPoints);
     std::vector<double> displacement(3*numOwnedPoints);
     double numerator, denominator;
     double k_n = (6*m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
-    double k_t = (6*m_Youngs_Modulus*(1-m_poissons_ratio))/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
+    double k_t = (6*m_Youngs_Modulus*(1-(3*m_poissons_ratio)))/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
 
    // std::vector<int> myBoundaryNodes = readNodeSet("nodeset_top.txt");
 
@@ -245,9 +236,9 @@ void PDHE::computeForce(const double dt,
             currentCoord[3*nodeID + 1] = oldCoord[3*nodeID + 1];
             currentCoord[3*nodeID + 2] = oldCoord[3*nodeID + 2];
 
-            double x = currentCoord[3*nodeID]; // x
-            double y = currentCoord[3*nodeID + 1]; // y
-            double z = currentCoord[3*nodeID + 2]; // z
+            double x = currentCoord[3*nodeID];
+            double y = currentCoord[3*nodeID + 1];
+            double z = currentCoord[3*nodeID + 2]; 
             double Volume_i = volume[nodeID];
             elementroutinehydrogen output;
 
@@ -272,13 +263,17 @@ void PDHE::computeForce(const double dt,
           currentCoord[3*nodeID] = oldCoord[3*nodeID];
           currentCoord[3*nodeID + 1] = oldCoord[3*nodeID + 1];
           currentCoord[3*nodeID + 2] = oldCoord[3*nodeID + 2];
-          
+
           double Px; double Py; double Pz;
           double x = currentCoord[3*nodeID]; // x
           double y = currentCoord[3*nodeID + 1]; // y
           double z = currentCoord[3*nodeID + 2]; // z
           double Volume_i = volume[nodeID];
           
+          displacement[3*nodeID] = x - modelCoord[3*nodeID];
+          displacement[3*nodeID + 1] = y - modelCoord[3*nodeID + 1];
+          displacement[3*nodeID + 2] = z - modelCoord[3*nodeID + 2];
+
           int numNeighbors = neighborhoodList[neighIndex++];
           double concenctration_nodeID = concentration[nodeID];
 
@@ -297,7 +292,7 @@ void PDHE::computeForce(const double dt,
           U_dot_half[3*nodeID + 1] = 0.5 * M_inverse[3*nodeID + 1] * P[3*nodeID + 1]*time_step_size_CDM;
           U_dot_half[3*nodeID + 2] = 0.5 * M_inverse[3*nodeID + 2] * P[3*nodeID + 2]*time_step_size_CDM;
 
-          if(nodeID == 0) // At initial material point F_n-1 = 1
+          /*if(nodeID == 0) // At initial material point F_n-1 = 1
             {
               if(U_dot_half[3*nodeID] == 0.0)
                 {K[3*nodeID] = 0;}
@@ -327,21 +322,20 @@ void PDHE::computeForce(const double dt,
                 K[3*nodeID + 1] = -((P[3*nodeID + 1]/m_ii) - (P[3*nodeID + 1-1]/m_ii))/(time_step_size_CDM * U_dot_half[3*nodeID + 1]);
                 K[3*nodeID + 2] = -((P[3*nodeID + 2]/m_ii) - (P[3*nodeID + 2-1]/m_ii))/(time_step_size_CDM * U_dot_half[3*nodeID + 2]);
               }
-            }
-          numerator = numerator + (displacement[3*nodeID] * K[3*nodeID] * displacement[3*nodeID])
-                                + (displacement[3*nodeID + 1] * K[3*nodeID + 1] * displacement[3*nodeID + 1])
-                                + (displacement[3*nodeID + 2] * K[3*nodeID + 2] * displacement[3*nodeID + 2]);
-          denominator = denominator + (displacement[3*nodeID] * displacement[3*nodeID])
-                                    + (displacement[3*nodeID + 1] * displacement[3*nodeID + 1])
-                                    + (displacement[3*nodeID + 2] * displacement[3*nodeID + 2]);
+            }*/
+          numerator = numerator + (displacement[3*nodeID] * P[3*nodeID])
+                                + (displacement[3*nodeID + 1] * P[3*nodeID + 1])
+                                + (displacement[3*nodeID + 2] * P[3*nodeID + 2]);
+          denominator = denominator + (displacement[3*nodeID] * m_ii * displacement[3*nodeID])
+                                    + (displacement[3*nodeID + 1] * m_ii * displacement[3*nodeID + 1])
+                                    + (displacement[3*nodeID + 2] * m_ii * displacement[3*nodeID + 2]);
 
         }
-
-        double c_n;
-        c_n = 2 * sqrt(numerator/denominator);
-        if(numerator <= 0.0 || c_n > 2.0)
-        {c_n = 1.9;}
-
+        //outFile << "numerator: " << numerator << endl;
+        //outFile << "denominator: " << denominator << endl;
+         //double c_n = 2 * sqrt(numerator/denominator);
+        double c_n = 1.9;
+        //outFile << "c_n: " << c_n << endl;
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
           int nodeID = ownedIDs[iID];
@@ -351,6 +345,10 @@ void PDHE::computeForce(const double dt,
                            (2*time_step_size_CDM * M_inverse[3*nodeID + 1] * P[3*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
           U_dot_n_plus_half[3*nodeID + 2] = (((2 - (time_step_size_CDM * c_n)) * U_dot_half[3*nodeID + 2]) +
                            (2*time_step_size_CDM * M_inverse[3*nodeID + 2] * P[3*nodeID + 2]))/(2 + (time_step_size_CDM*c_n));
+
+          double x = currentCoord[3*nodeID]; // x
+          double y = currentCoord[3*nodeID + 1]; // y
+          double z = currentCoord[3*nodeID + 2]; // y
 
           displacement[3*nodeID] = displacement[3*nodeID] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID]);
           displacement[3*nodeID + 1] = displacement[3*nodeID + 1] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID + 1]);
@@ -364,8 +362,6 @@ void PDHE::computeForce(const double dt,
           oldCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1];
           oldCoord[3*nodeID + 2] = currentCoord[3*nodeID + 2];
 
-          double x = currentCoord[3*nodeID]; // x
-          double y = currentCoord[3*nodeID + 1]; // y
           outFile << x << " " << y << " " << displacement[3*nodeID + 1] << endl; // if required damage value
           //cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
         }
