@@ -20,9 +20,9 @@ std::vector<double> eta_vec(std::vector<double> &disp_of_center, std::vector<dou
 std::vector<double> xi_vec(double x, double y, double z, double neigh_x, double neigh_y, double neigh_z) 
 {   
     std::vector<double> result(3);
-    result[0] = x - neigh_x;
-    result[1] = y - neigh_y;
-    result[2] = z - neigh_z;
+    result[0] = neigh_x - x;
+    result[1] = neigh_y - y;
+    result[2] = neigh_z - z;
     return result;
 }
 
@@ -31,7 +31,7 @@ double mod_xi(const std::vector<double> &result)
     return sqrt((result[0]*result[0]) + (result[1]*result[1]) + (result[2]*result[2]));
 }
 
-elementroutinehydrogen element_routine_hydrogen(int nodeID, double *currentCoord,double x, double y, double z,const int *neighborhoodList, int neighIndex, int numNeighbors, double m_horizon, double *concentration, double concentration_nodeID, double time_step_size_EFM, double dh, double Volume_i, double *volume)
+elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,double x, double y, double z,const int *neighborhoodList, int neighIndex, int numNeighbors, double m_horizon, double *concentration, double concentration_nodeID, double time_step_size_EFM, double dh, double Volume_i, double *volume)
 {
     double C_dot = 0.0;
     double individual_C_dot;
@@ -40,9 +40,9 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *currentCoord
     {
         int neighborID = neighborhoodList[neighIndex++];
         double neighborVolume = volume[neighborID];
-        double neigh_x = currentCoord[3*neighborID];
-        double neigh_y = currentCoord[3*neighborID + 1];
-        double neigh_z = currentCoord[3*neighborID + 2];
+        double neigh_x = modelCoord[3*neighborID];
+        double neigh_y = modelCoord[3*neighborID + 1];
+        double neigh_z = modelCoord[3*neighborID + 2];
 
         std::vector<double> xi;
         xi =  xi_vec(x, y, z, neigh_x, neigh_y, neigh_z);
@@ -58,11 +58,15 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *currentCoord
     return finalresult;
 }
 
-PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_horizon, double k_n, double k_t, double m_Sat_Val_Hyd_Conc, double m_Critic_Energy_Rel_Rate, double *currentCoord, double x, double y, double z, int nodeID,const int *neighborhoodList, int neighIndex, int numNeighbors, std::vector<double> &displacement, double *concentration, double concentration_nodeID, double m_min_grid_spacing)
+PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_horizon, double k_n, double k_t, double m_Sat_Val_Hyd_Conc, double m_Critic_Energy_Rel_Rate, double *modelCoord, double x, double y, double z, int nodeID,const int *neighborhoodList, int neighIndex, int numNeighbors, /*double *displacement*/std::vector<double> &displacement, double *concentration, double concentration_nodeID, double m_min_grid_spacing)
 {
     std::vector<double> PD_force_i(3, 0.0);
     PDResult result;
     std::vector<double> PD_force_i_j(3);
+    std::vector<double> disp_center(3);
+    std::vector<double> disp_j(3);
+    std::vector<double> eta(3); 
+    std::vector<double> xi(3);
     std::vector<double> b_d(numNeighbors);
     double damage_val = 0.0;
     double Volume_j = 0.0;
@@ -70,11 +74,10 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
     {
         int neighborID = neighborhoodList[neighIndex++];
         double neighborVolume = volume[neighborID];
-        double neigh_x = currentCoord[3*neighborID];
-        double neigh_y = currentCoord[3*neighborID + 1];
-        double neigh_z = currentCoord[3*neighborID + 2];
-        std::vector<double> disp_center(3);
-        std::vector<double> disp_j(3);
+        double neigh_x = modelCoord[3*neighborID];
+        double neigh_y = modelCoord[3*neighborID + 1];
+        double neigh_z = modelCoord[3*neighborID + 2];
+
         disp_center[0] = displacement[3*nodeID];
         disp_center[1] = displacement[3*nodeID + 1];
         disp_center[2] = displacement[3*nodeID + 2];
@@ -82,7 +85,6 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         disp_j[1] = displacement[3*neighborID + 1];
         disp_j[2] = displacement[3*neighborID + 2];
 
-        std::vector<double> eta(3); std::vector<double> xi(3);
         eta = eta_vec(disp_center, disp_j);
         xi = xi_vec(x, y, z, neigh_x, neigh_y, neigh_z);
         double mag_xi = mod_xi(xi);
@@ -102,9 +104,6 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         damage_val = damage_val + (b_d[n] * neighborVolume);
         Volume_j = Volume_j + neighborVolume;
     }
-
-    if(damage_val => 0.36)
-    {concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
     result.Px = PD_force_i[0];
     result.Py = PD_force_i[1];

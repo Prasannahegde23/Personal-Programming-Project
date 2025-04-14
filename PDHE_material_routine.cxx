@@ -38,7 +38,8 @@ PDOutputs material_routine_PD(double c, double m_horizon, double k_n, double k_t
     // Calculation of eta_n and eta_t
     for(int i=0; i<3; i++)
     {
-        eta_n[i] = ((pow(eta[0],2) + pow(eta[1],2) + pow(eta[2],2))/pow(mag_xi,2))*xi[i]; //eta_n
+        //eta_n[i] = ((pow(eta[0],2) + pow(eta[1],2) + pow(eta[2],2))/pow(mag_xi,2))*xi[i]; //eta_n
+        eta_n[i] = (eta[i] * xi[i])/mag_xi; //eta_n
         eta_t[i] = eta[i] - eta_n[i]; //eta_t
     }
    
@@ -59,11 +60,13 @@ PDOutputs material_routine_PD(double c, double m_horizon, double k_n, double k_t
     double Phi_j =  concentration_neighborID/m_Sat_Val_Hyd_Conc; // Hydrogen coverage of j
     double Phi = 0.5 * (Phi_i + Phi_j);
 
-    s_c0 = s_c0 * (1 - (1.0467*Phi) + (0.16874*pow(Phi,2)));
+    s_c0 = s_c0 * (1 - (1.0467*Phi) + (0.1687*pow(Phi,2)));
 
     // Scalar factor b_d which determines bond breakage
-    if (s < s_c0){b_d[n] = 1.0;}
-    else {b_d[n] = 0.0;}
+    if (s < s_c0)
+        {b_d[n] = 1.0;}
+    else 
+        {b_d[n] = 0.0;}
 
     if(b_d[n] == 0.0)
     {

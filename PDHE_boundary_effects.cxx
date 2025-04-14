@@ -30,7 +30,7 @@ std::vector<double> volume_correction(std::vector<double> &PD_force, double m_ho
         }
     }
 
-    else
+    if (mag_xi > check)
     {
         vol_corr_factor = (m_horizon - mag_xi + (m_min_grid_spacing/2))/m_min_grid_spacing;
         for(int k = 0; k<3; k++)
