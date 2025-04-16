@@ -3,12 +3,12 @@
 
 #include "Peridigm_Material.hpp"
 #include "Peridigm_Field.hpp"
-
+ 
 namespace PeridigmNS {
 
   class PDHE : public PeridigmNS::Material 
   {
-  public:
+  public: 
     // Constructor s
     PDHE(const Teuchos::ParameterList& params);
 
