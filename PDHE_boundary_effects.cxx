@@ -5,10 +5,10 @@
  
 using namespace std;
 
-PDParameter surface_correction(double k_n, double k_t, double m_horizon, double V_i, double V_j)
+PDParameter surface_correction(double k_n, double k_t, double m_horizon, double V_i, double V_j, double m_h)
 {
     double surf_correc_factor;
-    double V_0 = (4.0/3)*M_PI*pow(m_horizon,3);
+    double V_0 = m_h*M_PI*pow(m_horizon,2);
     PDParameter result;
     surf_correc_factor = (2 * V_0)/(V_i + V_j);
     result.K_n = surf_correc_factor * k_n;

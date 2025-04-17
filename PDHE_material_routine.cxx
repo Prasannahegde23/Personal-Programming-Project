@@ -32,7 +32,7 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
     double kn; double kt;
     
     PDParameter pdparameter;
-    pdparameter = surface_correction(k_n, k_t, m_horizon, Volume_i, neighborVolume); // boundary effects correction
+    pdparameter = surface_correction(k_n, k_t, m_horizon, Volume_i, neighborVolume, m_h); // boundary effects correction
     kn = pdparameter.K_n;
     kt = pdparameter.K_t;
     // Calculation of eta_n and eta_t
