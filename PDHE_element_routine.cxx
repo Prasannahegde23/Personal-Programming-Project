@@ -30,7 +30,7 @@ double mod_xi(const std::vector<double> &result)
     return sqrt((result[0]*result[0]) + (result[1]*result[1]));
 }
 
-elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,double x, double y,const int *neighborhoodList, int neighIndex, int numNeighbors, double m_horizon, double *concentration, double concentration_nodeID, double time_step_size_EFM, double dh, double Volume_i, double *volume)
+elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,double x, double y,const int *neighborhoodList, int neighIndex, int numNeighbors, double m_horizon, std::vector<double> &old_concentration, double concentration_nodeID, double time_step_size_EFM, double dh, double Volume_i, double *volume)
 {
     double C_dot = 0.0;
     double individual_C_dot;
@@ -45,18 +45,18 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,d
         std::vector<double> xi;
         xi =  xi_vec(x, y, neigh_x, neigh_y);
         double mag_xi = mod_xi(xi);
-        double concentration_neighborID = concentration[neighborID];
+        double concentration_neighborID = old_concentration[neighborID];
         individual_C_dot = material_routine_Hydrogen_conc(mag_xi, neighborVolume, dh, concentration_nodeID, concentration_neighborID);
         C_dot = C_dot + individual_C_dot;
     }
 
-    concentration[nodeID] = concentration[nodeID] + (C_dot * time_step_size_EFM); //Concentration of point
-    finalresult.conc = concentration[nodeID];
+    concentration_nodeID = concentration_nodeID + (C_dot * time_step_size_EFM); //Concentration of point
+    finalresult.conc = concentration_nodeID;
     finalresult.neighindex = neighIndex;
     return finalresult;
 }
 
-PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_h, double m_horizon, double k_n, double k_t, double m_Sat_Val_Hyd_Conc, double m_Critic_Energy_Rel_Rate, double *modelCoord, double x, double y, int nodeID,const int *neighborhoodList, int neighIndex, int numNeighbors, /*double *displacement*/std::vector<double> &displacement, double *concentration, double concentration_nodeID, double m_min_grid_spacing)
+PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_h, double m_horizon, double k_n, double k_t, double m_Sat_Val_Hyd_Conc, double m_Critic_Energy_Rel_Rate, double *modelCoord, double x, double y, int nodeID,const int *neighborhoodList, int neighIndex, int numNeighbors, /*double *displacement*/std::vector<double> &displacement, std::vector<double> &old_concentration, double concentration_nodeID, double m_min_grid_spacing, std::vector<double> &bondFactor/*, std::ostream &logStream*/)
 {
     std::vector<double> PD_force_i(2, 0.0);
     PDResult result;
@@ -65,7 +65,7 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
     std::vector<double> disp_j(2);
     std::vector<double> eta(2); 
     std::vector<double> xi(2);
-    std::vector<double> b_d(numNeighbors);
+    //std::vector<double> b_d(numNeighbors);
     double damage_val = 0.0;
     double Volume_j = 0.0;
     for(int n=0; n < numNeighbors; ++n)
@@ -82,19 +82,24 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
 
         eta = eta_vec(disp_center, disp_j);
         xi = xi_vec(x, y, neigh_x, neigh_y);
+
+        //logStream << "eta[0]" << eta[0] << endl;
+        //logStream << "eta[1]" << eta[1] << endl;
+        //logStream << "xi[0]" << xi[0] << endl;
+        //logStream << "xi[1]" << xi[1] << endl;
+
         double mag_xi = mod_xi(xi);
-        double concentration_neighborID = concentration[neighborID];
+        double concentration_neighborID = old_concentration[neighborID];
         PDOutputs out;
 
-        out = material_routine_PD(c, m_h, m_horizon, k_n, k_t, mag_xi, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, nodeID, neighborID, n, concentration_nodeID, concentration_neighborID, m_min_grid_spacing, Volume_i, neighborVolume, b_d, eta, xi);
+        out = material_routine_PD(c, m_h, m_horizon, k_n, k_t, mag_xi, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, nodeID, neighborID, n, concentration_nodeID, concentration_neighborID, m_min_grid_spacing, Volume_i, neighborVolume, bondFactor, eta, xi);
         PD_force_i_j[0] = out.PDforce_x;
         PD_force_i_j[1] = out.PDforce_y;
-        b_d[n] = out.bondVal;
-
+        bondFactor[n] = out.bondVal;
         PD_force_i[0] = PD_force_i[0] + PD_force_i_j[0];
         PD_force_i[1] = PD_force_i[1] + PD_force_i_j[1];
         
-        damage_val = damage_val + (b_d[n] * neighborVolume);
+        damage_val = damage_val + (bondFactor[n] * neighborVolume);
         Volume_j = Volume_j + neighborVolume;
     }
 

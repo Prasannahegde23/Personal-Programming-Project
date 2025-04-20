@@ -186,23 +186,30 @@ void PDHE::computeForce(const double dt,
 
     ofstream outFile(outputPath, std::ios::out | std::ios::app);
     //ofstream outFile(outputPath);
+    //double converted_Youngs_Modulus = m_Youngs_Modulus * 1000;     //  GPa to MPa
+    //double converted_GB_Diff_Coeff = m_GB_Diff_Coeff * 1e6;       // m2/s to mm2/s
+    //double m_Sat_Val_Hyd_Conc = m_Sat_Val_Hyd_Conc * 1e-6;
+    //double converted_density = m_density * 1e-6;
 
     double dh = (6 * m_GB_Diff_Coeff)/(M_PI * m_h * (pow(m_horizon,3))); // PD bond constant
     double c = (6 * m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1 - m_poissons_ratio)); // PD parameter
     double lambda_ii = 1.0;
+
     // Time steps size decleration
     //double time_step_size_CDM = (sqrt(m_density / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
-    double time_step_size_CDM = (sqrt(lambda_ii / (m_Youngs_Modulus*1000000000))) * (m_min_grid_spacing*0.001);
-    double time_step_size_EFM = (sqrt(m_density / m_Youngs_Modulus)) * 0.5 * m_min_grid_spacing;
-    //double time_step_size_CDM = 10000.0;
-    //double time_step_size_EFM = 1.0;
-    //double time_step_size_ADR = 10.0;
+    //double time_step_size_CDM = (sqrt(lambda_ii * 0.0001 / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
+    double time_step_size_CDM = (sqrt(lambda_ii * 0.0001 / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
+    //double time_step_size_EFM = (m_min_grid_spacing * m_min_grid_spacing) /(2 * converted_GB_Diff_Coeff);
+    double time_step_size_EFM = (sqrt(m_density / (m_Youngs_Modulus))) * (m_min_grid_spacing);
+    //double time_step_size_ADR = 1.0;
+
     
     // Other variables decleration
+    std::vector<std::vector<double>> m_bondFactor(numOwnedPoints); 
     //double m_ii = (M_PI * m_horizon * m_horizon * m_h * c)*(time_step_size_ADR * time_step_size_ADR)/(20 * m_min_grid_spacing);
 
-    //std::vector<double> U_dot_n_minus_half(3*numOwnedPoints);
-    //std::vector<double> U_dot_n_plus_half(3*numOwnedPoints);
+    //std::vector<double> U_dot_n_minus_half(2*numOwnedPoints);
+    //std::vector<double> U_dot_n_plus_half(2*numOwnedPoints);
 
     std::vector<double> old_force(2*numOwnedPoints);
     std::vector<double> old_displacement(2*numOwnedPoints);
@@ -211,9 +218,12 @@ void PDHE::computeForce(const double dt,
     //std::vector<double> M(3*numOwnedPoints);
     std::vector<double> P(2*numOwnedPoints);
     std::vector<double> K(2*numOwnedPoints);
-    //std::vector<double> M_inverse(3*numOwnedPoints);
+    //std::vector<double> M_inverse(2*numOwnedPoints);
     //std::vector<double> coordinates(2*numOwnedPoints);
     std::vector<double> displacement(2*numOwnedPoints, 0.0);
+    //std::vector<double> concentration(numOwnedPoints, 0.0);
+    std::vector<double> old_concentration(numOwnedPoints, 0.0);
+    //std::vector<double> new_concentration(numOwnedPoints, 0.0);
     
 
     double numerator, denominator;
@@ -222,6 +232,25 @@ void PDHE::computeForce(const double dt,
 
     std::vector<int> myBoundaryNodes1 = readNodeSet("nodeset_top.txt");
     std::vector<int> myBoundaryNodes2 = readNodeSet("nodeset_bottom.txt");
+    std::vector<int> myBoundaryNodes3 = readNodeSet("nodeset_concentration.txt");
+
+    for(int iID=0; iID < numOwnedPoints; ++iID)
+    {
+      int nodeID = ownedIDs[iID];
+      old_concentration[nodeID] = concentration[nodeID];
+    }
+
+    std::vector<int> numNeighbors(numOwnedPoints);
+    {
+      int idx = 0;
+      for(int iID=0; iID<numOwnedPoints; ++iID){
+        numNeighbors[iID] = neighborhoodList[idx++];
+        idx += numNeighbors[iID];
+      }
+    }
+
+    for(int iID=0; iID<numOwnedPoints; ++iID)
+    {m_bondFactor[iID].assign(numNeighbors[iID], 1.0);}
 
     if(outFile.is_open())
     {
@@ -236,13 +265,15 @@ void PDHE::computeForce(const double dt,
           if(i <= 1000)
           { 
             displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = (0.02/1000)*i;
+            displacement[2*nodeID + 1] = (2*1e-8)*i;
           }
           else
           { 
             displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = (0.02/1000)*i;
+            displacement[2*nodeID + 1] = (2*1e-5);
           }
+          /*displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = (2*1e-8)*i;*/
           //outFile << "After oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
         }
 
@@ -252,19 +283,28 @@ void PDHE::computeForce(const double dt,
           if(i <= 1000)
           {
             displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = -(0.02/1000)*i;
+            displacement[2*nodeID + 1] = -(2*1e-8)*i; 
           }
           else
           {
             displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = -0.02;
+            displacement[2*nodeID + 1] = -(2*1e-5);
           }
+          /*displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = -(2*1e-8)*i;*/
           //outFile << "After oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
         }
+
+        //old_concentration = concentration;
 
         for(int j=0; j < N_h ; j++)
         {
           //cout << "Hydrogen steps: "<< j+1 << endl;
+
+          for(auto nodeID : myBoundaryNodes3) 
+          {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+
+          //outFile << "Hydrogen_step: " << j << endl;
           int neighIndex = 0; // index into neighborhoodList
           for(int iID=0; iID < numOwnedPoints; ++iID)
           {
@@ -275,13 +315,20 @@ void PDHE::computeForce(const double dt,
             double y = modelCoord[3*nodeID + 1];
             double Volume_i = volume[nodeID];
             elementroutinehydrogen output;
+            //double time_step_size_EFM = (sqrt(converted_density* volume[nodeID]/ (converted_Youngs_Modulus))) * (m_min_grid_spacing);
 
             int numNeighbors = neighborhoodList[neighIndex++];
-            double concentration_nodeID = concentration[nodeID];
-            output = element_routine_hydrogen(nodeID, modelCoord, x, y, neighborhoodList, neighIndex, numNeighbors, m_horizon, concentration, concentration_nodeID, time_step_size_EFM, dh, Volume_i, volume);
-            concentration[nodeID] = output.conc;
+            double concentration_nodeID = old_concentration[nodeID];
+            output = element_routine_hydrogen(nodeID, modelCoord, x, y, neighborhoodList, neighIndex, numNeighbors, m_horizon, old_concentration, concentration_nodeID, time_step_size_EFM, dh, Volume_i, volume);
+            old_concentration[nodeID] = output.conc;
             neighIndex = output.neighindex;
+            
           }
+          for(auto nodeID : myBoundaryNodes3) 
+          {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+
+          //old_concentration.swap(new_concentration);
+          //outFile << endl << endl;
         }
 
         numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
@@ -296,45 +343,50 @@ void PDHE::computeForce(const double dt,
           //currentCoord[3*nodeID + 2] = currentCoord[3*nodeID + 2] + displacement[3*nodeID + 2];
           //if(i >= 900)
           //{outFile << currentCoord[3*nodeID] << " " << currentCoord[3*nodeID + 1] << " " << displacement[3*nodeID + 1] << endl;} // if required damage value}
-
           double Px; double Py;
           double x = modelCoord[3*nodeID]; // x
           double y = modelCoord[3*nodeID + 1]; // y
           double Volume_i = volume[nodeID];
 
-          int numNeighbors = neighborhoodList[neighIndex++];
-          double concenctration_nodeID = concentration[nodeID];
+          if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
+            {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
-          PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, concentration, concenctration_nodeID, m_min_grid_spacing);
+          int numNeighbors = neighborhoodList[neighIndex++];
+          double concenctration_nodeID = old_concentration[nodeID];
+
+          PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
           Px = pdResult.Px; Py = pdResult.Py; damage[nodeID] = pdResult.damage; neighIndex = pdResult.neighindex;
-          
-          if(damage[nodeID] >= 0.36)
-          {concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+
+
 
           P[2*nodeID] = Px /*+ body_force[nodeID]*/;
           P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
 
+          //if(i >= 0)
+          //{
+           // outFile << "P[2*nodeID]: " << P[2*nodeID] << endl;
+           // outFile << "P[2*nodeID + 1]: " << P[2*nodeID + 1] << endl;
+          //}
+         // outFile << endl;
+
           // Adavptive dynamic relaxtaion method
-          //M_inverse[3*nodeID] = (1/m_ii); // inverse matrix computation
-          //M_inverse[3*nodeID + 1] = (1/m_ii);
-          //M_inverse[3*nodeID + 2] = (1/m_ii);
+         /* M_inverse[2*nodeID] = (1/m_ii); // inverse matrix computation
+          M_inverse[2*nodeID + 1] = (1/m_ii);
 
-          /*if(i == 0)
+          if(i == 0)
           {
-            U_dot_n_minus_half[3*nodeID] = 0.5 * M_inverse[3*nodeID] * P[3*nodeID]*time_step_size_CDM;
-            U_dot_n_minus_half[3*nodeID + 1] = 0.5 * M_inverse[3*nodeID + 1] * P[3*nodeID + 1]*time_step_size_CDM;
-            U_dot_n_minus_half[3*nodeID + 2] = 0.5 * M_inverse[3*nodeID + 2] * P[3*nodeID + 2]*time_step_size_CDM;
+            U_dot_n_minus_half[2*nodeID] = 0.5 * M_inverse[2*nodeID] * P[2*nodeID]*time_step_size_CDM;
+            U_dot_n_minus_half[2*nodeID + 1] = 0.5 * M_inverse[2*nodeID + 1] * P[2*nodeID + 1]*time_step_size_CDM;
 
-            coordinates[3*nodeID] = modelCoord[3*nodeID];
-            coordinates[3*nodeID + 1] = modelCoord[3*nodeID + 1];
-            coordinates[3*nodeID + 2] = modelCoord[3*nodeID + 2];
+            //coordinates[3*nodeID] = modelCoord[3*nodeID];
+            //coordinates[3*nodeID + 1] = modelCoord[3*nodeID + 1];
+            //coordinates[3*nodeID + 2] = modelCoord[3*nodeID + 2];
           }
 
           else
           {
-            U_dot_n_minus_half[3*nodeID] = U_dot_n_plus_half[3*nodeID];
-            U_dot_n_minus_half[3*nodeID + 1] = U_dot_n_plus_half[3*nodeID + 1];
-            U_dot_n_minus_half[3*nodeID + 2] = U_dot_n_plus_half[3*nodeID + 2];
+            U_dot_n_minus_half[2*nodeID] = U_dot_n_plus_half[2*nodeID];
+            U_dot_n_minus_half[2*nodeID + 1] = U_dot_n_plus_half[2*nodeID + 1];
           }*/
 
 
@@ -342,9 +394,6 @@ void PDHE::computeForce(const double dt,
             {
               displacement_n_minus_one[2*nodeID] = 0.0;
               displacement_n_minus_one[2*nodeID + 1] = 0.0;
-
-              /*coordinates[2*nodeID] = modelCoord[2*nodeID];
-              coordinates[2*nodeID + 1] = modelCoord[2*nodeID + 1];*/
             }
 
           if(((displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]) == 0.0))
@@ -353,8 +402,8 @@ void PDHE::computeForce(const double dt,
             {K[2*nodeID + 1] = 0.0;}
           else
               {
-                K[2*nodeID] = -((P[2*nodeID]/lambda_ii) - (old_force[2*nodeID]/lambda_ii))/(displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]);
-                K[2*nodeID + 1] = -((P[2*nodeID + 1]/lambda_ii) - (old_force[2*nodeID + 1]/lambda_ii))/(displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]);
+                K[2*nodeID] = -((P[2*nodeID] - old_force[2*nodeID])/lambda_ii)/(displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]);
+                K[2*nodeID + 1] = -((P[2*nodeID + 1] - old_force[2*nodeID + 1])/lambda_ii)/(displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]);
               }
 
           numerator = numerator + (displacement[2*nodeID] * K[2*nodeID] * displacement[2*nodeID])
@@ -366,7 +415,7 @@ void PDHE::computeForce(const double dt,
         //outFile << "numerator " << numerator << endl;
         //outFile << "denominator " << denominator << endl;
         double c_n = 2 * sqrt(numerator/denominator);
-        if(c_n >= 2.0 || numerator <= 0.0 || denominator <= 0.0)
+        if(c_n >= 2.0 || numerator < 0.0 || denominator <= 0.0)
           {c_n = 1.9;}
         //outFile << "c_n : " << c_n << endl;
 
@@ -374,12 +423,11 @@ void PDHE::computeForce(const double dt,
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
           int nodeID = ownedIDs[iID];
-          /*U_dot_n_plus_half[3*nodeID] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[3*nodeID]) +
-                           (2*time_step_size_CDM * M_inverse[3*nodeID] * P[3*nodeID]))/(2 + (time_step_size_CDM*c_n));
-          U_dot_n_plus_half[3*nodeID + 1] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[3*nodeID + 1]) +
-                           (2*time_step_size_CDM * M_inverse[3*nodeID + 1] * P[3*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
-          U_dot_n_plus_half[3*nodeID + 2] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[3*nodeID + 2]) +
-                           (2*time_step_size_CDM * M_inverse[3*nodeID + 2] * P[3*nodeID + 2]))/(2 + (time_step_size_CDM*c_n));
+          /*U_dot_n_plus_half[2*nodeID] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[2*nodeID]) +
+                           (2*time_step_size_CDM * M_inverse[2*nodeID] * P[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
+          U_dot_n_plus_half[2*nodeID + 1] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[3*nodeID + 1]) +
+                           (2*time_step_size_CDM * M_inverse[2*nodeID + 1] * P[2*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
+
           */
 
          old_displacement[2*nodeID] = displacement[2*nodeID];
@@ -418,17 +466,17 @@ void PDHE::computeForce(const double dt,
           
           /*else
           {
-            displacement[3*nodeID] = displacement[3*nodeID] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID]);
-            displacement[3*nodeID + 1] = displacement[3*nodeID + 1] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID + 1]);
-            displacement[3*nodeID + 2] = displacement[3*nodeID + 2] + (time_step_size_CDM * U_dot_n_plus_half[3*nodeID + 2]);
+            displacement[2*nodeID] = displacement[2*nodeID] + (time_step_size_CDM * U_dot_n_plus_half[2*nodeID]);
+            displacement[2*nodeID + 1] = displacement[2*nodeID + 1] + (time_step_size_CDM * U_dot_n_plus_half[2*nodeID + 1]);
 
-            coordinates[3*nodeID] = coordinates[3*nodeID] + displacement[3*nodeID];
-            coordinates[3*nodeID + 1] = coordinates[3*nodeID + 1] + displacement[3*nodeID + 1];
-            coordinates[3*nodeID + 2] = coordinates[3*nodeID + 2] + displacement[3*nodeID + 2];
+            currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
+            currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
           }*/
 
           else
           {
+            //double time_step_size_CDM = (sqrt(converted_density* volume[nodeID]/ (converted_Youngs_Modulus))) * (m_min_grid_spacing);
+
             displacement[2*nodeID] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID]) + (4 * displacement[2*nodeID]) +
                                     (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
             displacement[2*nodeID + 1] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID + 1]) + (4 * displacement[2*nodeID + 1]) +
@@ -446,12 +494,25 @@ void PDHE::computeForce(const double dt,
           double x = currentCoord[3*nodeID]; // x
           double y = currentCoord[3*nodeID + 1]; // y
           //double z = coordinates[3*nodeID + 2]; // z
-          //damage[nodeID]
-          if(i >= 0)
-          {outFile << x << " " << y << " " << displacement[2*nodeID + 1] << endl;} // if required damage value}
+          //displacement[2*nodeID + 1] damage[nodeID]
+          if(i >= 2980)
+          {
+            /*for(auto b : myBoundaryNodes3) 
+            {
+              if(i <= 1000)
+            {
+              displacement[2*b + 1] = (2*1e-8)*i; 
+            }
+            else
+            {
+              displacement[2*nodeID + 1] = (2*1e-5);
+            }
+            }*/
+
+            outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;} // if required damage value}
           //cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
         }
-        if(i >= 0)
+        if(i >= 2980)
         {outFile << endl << endl;}
       }
       outFile.close();
