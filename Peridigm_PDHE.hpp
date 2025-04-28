@@ -26,6 +26,7 @@ namespace PeridigmNS {
     virtual double Horizon() const;
     virtual int Nt() const;
     virtual int Nh() const;
+    virtual int Captureloadsteps() const;
     virtual double h() const;
     virtual double minGridSpacing() const;
 
@@ -54,6 +55,7 @@ namespace PeridigmNS {
     double m_horizon;
     int N_t;                          // No. of load steps
     int N_h;                          // No. of steps for hydrogen concentration
+    int N;                            // Capture and save the simulation frame from N load steps
 
     // Geometrical Parameters
     double m_h;                         // thickness
@@ -70,6 +72,9 @@ namespace PeridigmNS {
 
     // We keep a list of all field IDs so Peridigm knows what we use
     std::vector<int> m_fieldIds;
+
+    mutable std::vector<std::vector<double>> m_bondFactor;
+    mutable std::vector<double>              damage;         // before you only had a local
   };
 
 }

@@ -24,7 +24,7 @@ double material_routine_Hydrogen_conc(double mag_xi, double neighborVolume, doub
 {
     double C_dot;
 
-    if(mag_xi < 1e-15) 
+    if(mag_xi < 1e-8) 
     {C_dot = 0.0;}
 
     else
@@ -36,18 +36,19 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
 {
     PDOutputs out;
 
-    if(mag_xi < 1e-20) 
+    /*if(mag_xi < 1e-140) 
     {
         out.PDforce_x = 0.0;
         out.PDforce_y = 0.0;
         out.bondVal = 0.0;
         return out;
-    }
+    }*/
 
     std::vector<double> eta_n(2);
     std::vector<double> eta_t(2);
     double kn; double kt;
-    
+    double bond_factor;
+
     PDParameter pdparameter;
     pdparameter = surface_correction(k_n, k_t, m_horizon, Volume_i, neighborVolume, m_h); // boundary effects correction
     kn = pdparameter.K_n;
@@ -82,6 +83,7 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
         double Phi = 0.5 * (Phi_i + Phi_j);
         //Phi = std::clamp(Phi, 0.0, 1.0);
         s_c0 = s_c0 * (1 - (1.0467*Phi) + (0.1687*pow(Phi,2)));
+        Phi = std::clamp(Phi, 0.0, 1.0);
         //s = s + 1.0;
         //if(s>0.0)
        //{cout << "Critical stretch with hydrogen coverage: " << s_c0 << endl;
@@ -91,21 +93,21 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
 
 
     // Scalar factor b_d which determines bond breakage
-    if (abs(s) < s_c0)
+    if (s >= s_c0 || b_d[n] == 0.0)
     {
-        b_d[n] = 1.0;
-        PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing, nodeID, neighborID);
+        bond_factor = 0.0;
+        for(int i=0; i<2; i++)
+        { PD_force[i] = 0.0;}
     }
     else 
     {
-        b_d[n] = 0.0;
-        for(int i=0; i<2; i++)
-        { PD_force[i] = 0.0;}
+        bond_factor = 1.0;
+        PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing, nodeID, neighborID);
     }
 
     out.PDforce_x = PD_force[0];
     out.PDforce_y = PD_force[1];
-    out.bondVal = b_d[n];
+    out.bondVal = bond_factor;
 
     return out; 
 }

@@ -7,8 +7,9 @@ struct PDResult
     double Py;
     double damage;
     int neighindex;
+    std::vector<double> bondFac;
 };
-
+  
 struct elementroutinehydrogen 
 { 
     double conc;

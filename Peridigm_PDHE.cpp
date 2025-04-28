@@ -5,6 +5,8 @@
 #include <filesystem>      // For current_path()
 #include <Teuchos_ParameterList.hpp>
 #include <algorithm> // For std::max_element
+#include <unordered_set>
+#include <numeric> 
 #include "Peridigm_Field.hpp"
 #include "material_utilities.h"
 #include "Peridigm_PDHE.hpp"
@@ -21,7 +23,7 @@ namespace PeridigmNS
   //---------------------------------------------------------------------------//
   PDHE::PDHE(const Teuchos::ParameterList& params): Material(params),
   m_Youngs_Modulus(0.0), m_GB_Diff_Coeff(0.0), m_Sat_Val_Hyd_Conc(0.0), m_Critic_Energy_Rel_Rate(0.0), m_density(0.0), m_poissons_ratio(0.0),
-  m_horizon(0.0), N_t(0), N_h(0), 
+  m_horizon(0.0), N_t(0), N_h(0), N(0),
   m_h(0.0), m_min_grid_spacing(0.0),
   m_modelCoordinatesFieldId(-1), m_coordinatesFieldId(-1), m_volumeFieldId(-1), m_concentrationFieldId(-1), m_damageFieldId(-1), m_bodyForceFieldId(-1)
 
@@ -42,6 +44,7 @@ namespace PeridigmNS
     m_horizon = params.get<double>("Horizon");
     N_t = params.get<int>("No. of load steps");
     N_h = params.get<int>("No. of steps for hydrogen concentration");
+    N = params.get<int>("Capture and save the simulation frame from N load steps");
 
     // Read Geometrical parameters
     m_h = params.get<double>("Thickness");
@@ -110,6 +113,9 @@ int PDHE::Nt() const
 int PDHE::Nh() const 
 {return N_h;}
 
+int PDHE::Captureloadsteps() const 
+{return N;}
+
 double PDHE::h() const 
 {return m_h;}
 
@@ -152,6 +158,18 @@ std::vector<int> readNodeSet(const std::string& fileName)
   return nodeSet;
 }
 
+// Simple union-find 
+struct UnionFind {
+  std::vector<int> parent;
+  UnionFind(int N) : parent(N) { std::iota(parent.begin(), parent.end(), 0); }
+  int find(int i){ return parent[i]==i ? i : parent[i]=find(parent[i]); }
+  void unite(int i,int j){
+    i = find(i); j = find(j);
+    if(i!=j) parent[j]=i;
+  }
+};
+
+
 //---------------------------------------------------------------------------//
 // computeForce(): This is called by Peridigm to compute internal forces.
 //---------------------------------------------------------------------------//
@@ -166,7 +184,7 @@ void PDHE::computeForce(const double dt,
     double *oldCoord;
     double *volume; 
     double *concentration;
-    double *damage;
+    //double *damage;
     //double *displacement;
     double *body_force;
 
@@ -175,7 +193,7 @@ void PDHE::computeForce(const double dt,
     dataManager.getData(m_coordinatesFieldId,      PeridigmField::STEP_NP1)->ExtractView(&currentCoord);
     dataManager.getData(m_volumeFieldId,           PeridigmField::STEP_NONE)->ExtractView(&volume);
     dataManager.getData(m_concentrationFieldId,    PeridigmField::STEP_NP1)->ExtractView(&concentration);
-    dataManager.getData(m_damageFieldId, PeridigmField::STEP_NP1)->ExtractView(&damage);
+    //dataManager.getData(m_damageFieldId, PeridigmField::STEP_NP1)->ExtractView(&damage);
     dataManager.getData(m_coordinatesFieldId, PeridigmField::STEP_N)->ExtractView(&oldCoord);
     //dataManager.getData(m_displacementFieldID, PeridigmField::STEP_NP1)->ExtractView(&displacement);
 
@@ -198,14 +216,14 @@ void PDHE::computeForce(const double dt,
     // Time steps size decleration
     //double time_step_size_CDM = (sqrt(m_density / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
     //double time_step_size_CDM = (sqrt(lambda_ii * 0.0001 / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
-    double time_step_size_CDM = (sqrt(lambda_ii * 0.0001 / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
+    double time_step_size_CDM = (sqrt(m_density * 0.0001 / (m_Youngs_Modulus))) * (m_min_grid_spacing);
     //double time_step_size_EFM = (m_min_grid_spacing * m_min_grid_spacing) /(2 * converted_GB_Diff_Coeff);
     double time_step_size_EFM = (sqrt(m_density / (m_Youngs_Modulus))) * (m_min_grid_spacing);
     //double time_step_size_ADR = 1.0;
 
     
     // Other variables decleration
-    std::vector<std::vector<double>> m_bondFactor(numOwnedPoints); 
+    //std::vector<std::vector<double>> m_bondFactor(numOwnedPoints); 
     //double m_ii = (M_PI * m_horizon * m_horizon * m_h * c)*(time_step_size_ADR * time_step_size_ADR)/(20 * m_min_grid_spacing);
 
     //std::vector<double> U_dot_n_minus_half(2*numOwnedPoints);
@@ -223,7 +241,7 @@ void PDHE::computeForce(const double dt,
     std::vector<double> displacement(2*numOwnedPoints, 0.0);
     //std::vector<double> concentration(numOwnedPoints, 0.0);
     std::vector<double> old_concentration(numOwnedPoints, 0.0);
-    //std::vector<double> new_concentration(numOwnedPoints, 0.0);
+    //std::vector<double> damage(numOwnedPoints, 0.0);
     
 
     double numerator, denominator;
@@ -240,6 +258,12 @@ void PDHE::computeForce(const double dt,
       old_concentration[nodeID] = concentration[nodeID];
     }
 
+    std::unordered_map<int,int> globalToLocal;
+    globalToLocal.reserve(numOwnedPoints);
+    for(int iID = 0; iID < numOwnedPoints; ++iID)
+      globalToLocal[ ownedIDs[iID] ] = iID;
+
+      
     std::vector<int> numNeighbors(numOwnedPoints);
     {
       int idx = 0;
@@ -249,8 +273,68 @@ void PDHE::computeForce(const double dt,
       }
     }
 
+    m_bondFactor.resize(numOwnedPoints);
+    damage.assign(numOwnedPoints, 0.0);
+
     for(int iID=0; iID<numOwnedPoints; ++iID)
     {m_bondFactor[iID].assign(numNeighbors[iID], 1.0);}
+
+    vector<vector<int>> neighborListVec(numOwnedPoints);
+    int idx=0;
+    for(int i=0;i<numOwnedPoints;++i){
+      int n = neighborhoodList[idx++];
+      neighborListVec[i].assign(&neighborhoodList[idx], &neighborhoodList[idx+n]);
+      idx += n;
+    }
+
+    // --- NEW: break all bonds along the initial crack face ---
+  std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
+  std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
+  std::unordered_set<int> crackTopSet(crackTop.begin(), crackTop.end());
+  std::unordered_set<int> crackBotSet(crackBottom.begin(), crackBottom.end());
+  std::unordered_set<int> displacementBC;
+  for(auto id : myBoundaryNodes1) displacementBC.insert(id);
+  for(auto id : myBoundaryNodes2) displacementBC.insert(id);
+
+// --- after you've built globalToLocal and neighborListVec (vector<vector<int>> of neighbor IDs) ---
+
+// break all bonds along the initial crack face, _symmetrically_
+// --- break all bonds along the initial crack face, _symmetrically_ ---
+for(int i=0; i<numOwnedPoints; ++i){
+  int g = ownedIDs[i];
+  // 💥 never sever ANY bond touching a BC node
+  if(displacementBC.count(g))
+    continue;
+
+  auto &nbrs  = neighborListVec[i];
+  auto &bonds = m_bondFactor[i];
+  for(int n=0; n<(int)nbrs.size(); ++n){
+    int h = nbrs[n];
+    // 💥 skip if neighbor is a BC node
+    if(displacementBC.count(h))
+      continue;
+
+    bool top2bot = crackTopSet.count(g) && crackBotSet.count(h);
+    bool bot2top = crackBotSet.count(g) && crackTopSet.count(h);
+    if(top2bot || bot2top){
+      bonds[n] = 0.0;  // sever here
+      // mirror-sever on the other side
+      auto it = globalToLocal.find(h);
+      if(it != globalToLocal.end()){
+        int j = it->second;
+        auto &nbrsJ  = neighborListVec[j];
+        auto &bondsJ = m_bondFactor[j];
+        for(int m=0; m<(int)nbrsJ.size(); ++m){
+          if(nbrsJ[m] == g){
+            bondsJ[m] = 0.0;  // 💥 and on mirror side
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
 
     if(outFile.is_open())
     {
@@ -260,6 +344,7 @@ void PDHE::computeForce(const double dt,
         cout << "Load steps: "<< i+1 << endl << endl;
         // Displacement BC
         //outFile << "myBoundaryNodes1:" << endl;
+
         for(auto nodeID : myBoundaryNodes1)
         {
           if(i <= 1000)
@@ -280,6 +365,7 @@ void PDHE::computeForce(const double dt,
         for(auto nodeID : myBoundaryNodes2)
         {
           //outFile << "Before oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
+          
           if(i <= 1000)
           {
             displacement[2*nodeID] = 0.0;
@@ -295,14 +381,18 @@ void PDHE::computeForce(const double dt,
           //outFile << "After oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
         }
 
-        //old_concentration = concentration;
+        //Writing Load step number into text file
+        if(i >= N)
+        {outFile << "Load step: " << i << endl;}
 
         for(int j=0; j < N_h ; j++)
         {
           //cout << "Hydrogen steps: "<< j+1 << endl;
 
           for(auto nodeID : myBoundaryNodes3) 
-          {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+          {
+            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
+          }
 
           //outFile << "Hydrogen_step: " << j << endl;
           int neighIndex = 0; // index into neighborhoodList
@@ -325,11 +415,67 @@ void PDHE::computeForce(const double dt,
             
           }
           for(auto nodeID : myBoundaryNodes3) 
-          {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+          {
+            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
+          }
 
           //old_concentration.swap(new_concentration);
           //outFile << endl << endl;
         }
+
+          // 1) build UF
+          UnionFind uf(numOwnedPoints);
+          // 2) unify only intact bonds
+          int idx = 0;
+          for(int iID=0; iID<numOwnedPoints; ++iID){
+            int nbors = neighborhoodList[idx++];
+            for(int n=0; n<nbors; ++n){
+              int nbrGlobal = neighborhoodList[idx + n];
+              if(m_bondFactor[iID][n] > 0.0){
+                auto it = globalToLocal.find(nbrGlobal);
+                if(it != globalToLocal.end())
+                  uf.unite(iID, it->second);
+              }
+            }
+            idx += nbors;
+          }
+    // 3) sever any horizon pair in different UF sets
+// --- sever any horizon‐pair in different UF sets ---
+idx = 0;
+for(int iID=0; iID<numOwnedPoints; ++iID){
+  int g     = ownedIDs[iID];
+  int nbors = neighborhoodList[idx++];
+
+  // 💥 skip entire BC node so none of its bonds get cut
+  if(displacementBC.count(g)){
+    idx += nbors;
+    continue;
+  }
+
+  for(int n=0; n<nbors; ++n){
+    int h = neighborhoodList[idx + n];
+    // 💥 skip cutting any bond into a BC node
+    if(displacementBC.count(h))
+      continue;
+
+    auto it = globalToLocal.find(h);
+    if(it != globalToLocal.end() && uf.find(iID) != uf.find(it->second)){
+      m_bondFactor[iID][n] = 0.0;  // sever here
+      // mirror‐sever on the other side
+      auto &nbrsJ = neighborListVec[it->second];
+      auto &bJ     = m_bondFactor[it->second];
+      for(int m=0; m<(int)nbrsJ.size(); ++m){
+        if(nbrsJ[m] == g){
+          bJ[m] = 0.0;  // 💥 and mirror‐sever here
+          break;
+        }
+      }
+    }
+  }
+  idx += nbors;
+}
+
+
 
         numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
         //outFile << "Iteration: " << iter << endl;
@@ -348,16 +494,36 @@ void PDHE::computeForce(const double dt,
           double y = modelCoord[3*nodeID + 1]; // y
           double Volume_i = volume[nodeID];
 
+          for(auto nodeID : myBoundaryNodes3) 
+          {
+            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
+          }
+
           if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
             {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
           int numNeighbors = neighborhoodList[neighIndex++];
           double concenctration_nodeID = old_concentration[nodeID];
 
+          if(displacementBC.count(nodeID)) {
+            damage[iID] = 0.0;
+            // restore all bonds to “intact” on that row
+            std::fill(m_bondFactor[iID].begin(),
+                      m_bondFactor[iID].end(), 1.0);
+            // zero out internal force if you like (optional)
+            P[2*nodeID]     = 0.0;
+            P[2*nodeID + 1] = 0.0;
+            // advance your neighIndex past this node’s neighbors
+            neighIndex += numNeighbors;
+            continue;
+          }
+
           PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
-          Px = pdResult.Px; Py = pdResult.Py; damage[nodeID] = pdResult.damage; neighIndex = pdResult.neighindex;
+          Px = pdResult.Px; Py = pdResult.Py; damage[iID] = pdResult.damage; neighIndex = pdResult.neighindex; m_bondFactor[iID] = pdResult.bondFac;
 
-
+          double sum = std::accumulate(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 0.0);
+          double dNew = 1.0 - sum/m_bondFactor[iID].size();
+          damage[iID] = std::max(damage[iID], dNew);
 
           P[2*nodeID] = Px /*+ body_force[nodeID]*/;
           P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
@@ -434,7 +600,7 @@ void PDHE::computeForce(const double dt,
          old_displacement[2*nodeID + 1] = displacement[2*nodeID + 1];
 
           int flag = 0;
-          for(int nodecheckID = 0; nodecheckID < myBoundaryNodes1.size(); nodecheckID++)
+          for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes1.size(); nodecheckID++)
           {
             if(nodeID == myBoundaryNodes1[nodecheckID])
             {
@@ -446,7 +612,7 @@ void PDHE::computeForce(const double dt,
               continue;
           }
 
-          for(int nodecheckID = 0; nodecheckID < myBoundaryNodes2.size(); nodecheckID++)
+          for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes2.size(); nodecheckID++)
           {
             if(nodeID == myBoundaryNodes2[nodecheckID])
             {
@@ -495,7 +661,7 @@ void PDHE::computeForce(const double dt,
           double y = currentCoord[3*nodeID + 1]; // y
           //double z = coordinates[3*nodeID + 2]; // z
           //displacement[2*nodeID + 1] damage[nodeID]
-          if(i >= 2980)
+          if(i >= N)
           {
             /*for(auto b : myBoundaryNodes3) 
             {
@@ -509,10 +675,11 @@ void PDHE::computeForce(const double dt,
             }
             }*/
 
-            outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;} // if required damage value}
+            outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;
+          } // if required damage value}
           //cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
         }
-        if(i >= 2980)
+        if(i >= N)
         {outFile << endl << endl;}
       }
       outFile.close();

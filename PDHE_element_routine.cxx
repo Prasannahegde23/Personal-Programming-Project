@@ -41,6 +41,7 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,d
         double neighborVolume = volume[neighborID];
         double neigh_x = modelCoord[3*neighborID];
         double neigh_y = modelCoord[3*neighborID + 1];
+        
 
         std::vector<double> xi;
         xi =  xi_vec(x, y, neigh_x, neigh_y);
@@ -80,17 +81,17 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         disp_j[0] = displacement[2*neighborID];
         disp_j[1] = displacement[2*neighborID + 1];
 
+        double dx = (modelCoord[3*neighborID] + disp_j[0]) - (x + disp_center[0]);
+        double dy = (modelCoord[3*neighborID+1] + disp_j[1]) - (y + disp_center[1]);
+        if(std::sqrt(dx*dx + dy*dy) > m_horizon || bondFactor[n]==0.0)
+          continue;  // permanently skip any broken or over-stretched pair
+          
         eta = eta_vec(disp_center, disp_j);
         xi = xi_vec(x, y, neigh_x, neigh_y);
 
-        //logStream << "eta[0]" << eta[0] << endl;
-        //logStream << "eta[1]" << eta[1] << endl;
-        //logStream << "xi[0]" << xi[0] << endl;
-        //logStream << "xi[1]" << xi[1] << endl;
-
         double mag_xi = mod_xi(xi);
         double concentration_neighborID = old_concentration[neighborID];
-        PDOutputs out;
+        PDOutputs out;   
 
         out = material_routine_PD(c, m_h, m_horizon, k_n, k_t, mag_xi, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, nodeID, neighborID, n, concentration_nodeID, concentration_neighborID, m_min_grid_spacing, Volume_i, neighborVolume, bondFactor, eta, xi);
         PD_force_i_j[0] = out.PDforce_x;
@@ -107,6 +108,7 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
     result.Py = PD_force_i[1];
     result.damage = 1 - (damage_val)/(Volume_j);
     result.neighindex = neighIndex;
+    result.bondFac = bondFactor;
 
     return result;
 }
