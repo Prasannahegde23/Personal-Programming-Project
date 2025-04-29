@@ -67,14 +67,13 @@ namespace PeridigmNS {
     int m_volumeFieldId;             // per-node volume
     int m_concentrationFieldId;      // Used for hydrogen concentration
     int m_damageFieldId;             // Used to store Damage value
-    //int m_displacementFieldID;       // Used to store Displacment value
     int m_bodyForceFieldId;       // Used to store Body force value
 
-    // We keep a list of all field IDs so Peridigm knows what we use
+    // List of all field IDs
     std::vector<int> m_fieldIds;
 
     mutable std::vector<std::vector<double>> m_bondFactor;
-    mutable std::vector<double>              damage;         // before you only had a local
+    mutable std::vector<double> damage;
   };
 
 }

@@ -19,20 +19,34 @@ namespace PeridigmNS
 { 
 
   //---------------------------------------------------------------------------//
-  // Constructor: Register which fields your material model needs.
+  // Constructor: Register required fields and read parameters from input
   //---------------------------------------------------------------------------//
-  PDHE::PDHE(const Teuchos::ParameterList& params): Material(params),
-  m_Youngs_Modulus(0.0), m_GB_Diff_Coeff(0.0), m_Sat_Val_Hyd_Conc(0.0), m_Critic_Energy_Rel_Rate(0.0), m_density(0.0), m_poissons_ratio(0.0),
-  m_horizon(0.0), N_t(0), N_h(0), N(0),
+  PDHE::PDHE(const Teuchos::ParameterList& params): 
+  Material(params), // Base class constructor
+
+  // Initialize all scalar members to zero or invalid ID
+  m_Youngs_Modulus(0.0), 
+  m_GB_Diff_Coeff(0.0), 
+  m_Sat_Val_Hyd_Conc(0.0), 
+  m_Critic_Energy_Rel_Rate(0.0), 
+  m_density(0.0), 
+  m_poissons_ratio(0.0),
+  m_horizon(0.0), 
+  N_t(0), N_h(0), N(0),
   m_h(0.0), m_min_grid_spacing(0.0),
-  m_modelCoordinatesFieldId(-1), m_coordinatesFieldId(-1), m_volumeFieldId(-1), m_concentrationFieldId(-1), m_damageFieldId(-1), m_bodyForceFieldId(-1)
+  m_modelCoordinatesFieldId(-1), 
+  m_coordinatesFieldId(-1), 
+  m_volumeFieldId(-1), 
+  m_concentrationFieldId(-1), 
+  m_damageFieldId(-1), 
+  m_bodyForceFieldId(-1)
 
   { 
     //---------------------------------------------------------------------------//
     // In this section, all the required parameters are read from the ParameterList
     //---------------------------------------------------------------------------//
 
-    // Read material parameters
+    // Read material parameters from the user-specified ParameterList
     m_Youngs_Modulus = params.get<double>("Young's Modulus");
     m_GB_Diff_Coeff = params.get<double>("Grain boundary diffusion coefficient");
     m_Sat_Val_Hyd_Conc = params.get<double>("Saturated value of hydrogen concentration");
@@ -40,13 +54,13 @@ namespace PeridigmNS
     m_density = params.get<double>("Density");
     m_poissons_ratio = params.get<double>("Poisson's ratio");
 
-    // Read Input Parameters
+    // Read simulation control parameters
     m_horizon = params.get<double>("Horizon");
     N_t = params.get<int>("No. of load steps");
     N_h = params.get<int>("No. of steps for hydrogen concentration");
     N = params.get<int>("Capture and save the simulation frame from N load steps");
 
-    // Read Geometrical parameters
+    // Read geometric parameters
     m_h = params.get<double>("Thickness");
     m_min_grid_spacing = params.get<double>("Minimum grid spacing");
 
@@ -55,6 +69,7 @@ namespace PeridigmNS
     // data fields are tracked in Peridigm
     //---------------------------------------------------------------------------//
 
+    // Obtain field IDs from Peridigm's FieldManager
     PeridigmNS::FieldManager& fieldManager = PeridigmNS::FieldManager::self();
     m_modelCoordinatesFieldId = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::VECTOR, PeridigmField::CONSTANT, "Model_Coordinates");
     m_coordinatesFieldId = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::VECTOR, PeridigmField::TWO_STEP, "Coordinates");
@@ -78,7 +93,7 @@ namespace PeridigmNS
   }
 
 //---------------------------------------------------------------------------//
-// Implementation of pure virtuals:
+// Material metadata: unique name and property accessors
 //---------------------------------------------------------------------------//
 
 std::string PDHE::Name() const 
@@ -129,6 +144,10 @@ double PDHE::BulkModulus() const
 double PDHE::ShearModulus() const 
 {return 0.0;}
 
+//---------------------------------------------------------------------------//
+// readNodeSet: Utility to load a list of node IDs from a text file       //
+//---------------------------------------------------------------------------//
+
 std::vector<int> readNodeSet(const std::string& fileName) 
 {
   std::vector<int> nodeSet;
@@ -150,11 +169,16 @@ std::vector<int> readNodeSet(const std::string& fileName)
   return nodeSet;
 }
 
-// Simple union-find 
+//---------------------------------------------------------------------------//
+// UnionFind: Simple disjoint-set data structure for connectivity tests     //
+//---------------------------------------------------------------------------//
+
 struct UnionFind 
 {
   std::vector<int> parent;
+  // Initialize each node to be its own parent
   UnionFind(int N) : parent(N) { std::iota(parent.begin(), parent.end(), 0); }
+   // Path compression
   int find(int i){ return parent[i]==i ? i : parent[i]=find(parent[i]); }
   void unite(int i,int j)
   {
@@ -164,7 +188,7 @@ struct UnionFind
 };
 
 //---------------------------------------------------------------------------//
-// computeForce(): This is called by Peridigm to compute internal forces.
+// computeForce(): This is called by Peridigm
 //---------------------------------------------------------------------------//
 void PDHE::computeForce(const double dt,
                       const int numOwnedPoints,                                              
@@ -172,6 +196,7 @@ void PDHE::computeForce(const double dt,
                       const int* neighborhoodList,
                       PeridigmNS::DataManager& dataManager) const
   {
+    // Extract pointers to all required field data
     double *modelCoord; 
     double *currentCoord;
     double *oldCoord;
@@ -179,24 +204,26 @@ void PDHE::computeForce(const double dt,
     double *concentration;
     double *body_force;
 
-    // Access Field IDs with the IDs you grabbed in constructor
+    // Access Field IDs with the IDs that were grabbed in constructor
     dataManager.getData(m_modelCoordinatesFieldId, PeridigmField::STEP_NONE)->ExtractView(&modelCoord);
     dataManager.getData(m_coordinatesFieldId,      PeridigmField::STEP_NP1)->ExtractView(&currentCoord);
     dataManager.getData(m_volumeFieldId,           PeridigmField::STEP_NONE)->ExtractView(&volume);
     dataManager.getData(m_concentrationFieldId,    PeridigmField::STEP_NP1)->ExtractView(&concentration);
     dataManager.getData(m_coordinatesFieldId,      PeridigmField::STEP_N)->ExtractView(&oldCoord);
 
+    // Prepare output file for logging results
     string outputFileName = "Output.txt";
     fs::path currentDir = fs::current_path();
     fs::path outputPath = currentDir / outputFileName;
 
     ofstream outFile(outputPath, std::ios::out | std::ios::app);
 
+    // Compute peridynamic bond constants
     double dh = (6 * m_GB_Diff_Coeff)/(M_PI * m_h * (pow(m_horizon,3))); // PD bond constant
     double c = (6 * m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1 - m_poissons_ratio)); // PD parameter
-    double lambda_ii = 1.0;
+    double lambda_ii = 1.0; // lambda scaling
 
-    // Time steps size decleration
+    // Estimate stable time step sizes
     double time_step_size_CDM = (sqrt(m_density * 0.0001 / (m_Youngs_Modulus))) * (m_min_grid_spacing);
     double time_step_size_EFM = (sqrt(m_density / (m_Youngs_Modulus))) * (m_min_grid_spacing);
 
@@ -211,25 +238,31 @@ void PDHE::computeForce(const double dt,
     std::vector<double> K(2*numOwnedPoints);
     double numerator, denominator;
 
-    //PD parameters
+    //Precompute PD parameters
     double k_n = (6*m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
     double k_t = (6*m_Youngs_Modulus*(1-(3*m_poissons_ratio)))/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
 
+    // Load boundary node sets: top displacement, bottom displacement, hydrogen BCs, crack nodeIds
     std::vector<int> myBoundaryNodes1 = readNodeSet("nodeset_top.txt");
     std::vector<int> myBoundaryNodes2 = readNodeSet("nodeset_bottom.txt");
     std::vector<int> myBoundaryNodes3 = readNodeSet("nodeset_concentration.txt");
+    std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
+    std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
 
+    // Initialize old_concentration from the field
     for(int iID=0; iID < numOwnedPoints; ++iID)
     {
       int nodeID = ownedIDs[iID];
       old_concentration[nodeID] = concentration[nodeID];
     }
 
+    // Build global-to-local ID map for quick neighbor lookups
     std::unordered_map<int,int> globalToLocal;
     globalToLocal.reserve(numOwnedPoints);
     for(int iID = 0; iID < numOwnedPoints; ++iID)
       {globalToLocal[ ownedIDs[iID] ] = iID;}
 
+    // Read neighbor counts per node to reconstruct adjacency lists, will be used for storing bond factor
     std::vector<int> numNeighbors(numOwnedPoints);
     {
       int idx = 0;
@@ -240,12 +273,13 @@ void PDHE::computeForce(const double dt,
       }
     }
 
+    // Initialize bond factors (1.0 = intact, 0.0 = broken)
     m_bondFactor.resize(numOwnedPoints);
     damage.assign(numOwnedPoints, 0.0);
-
     for(int iID=0; iID<numOwnedPoints; ++iID)
     {m_bondFactor[iID].assign(numNeighbors[iID], 1.0);}
 
+    // Convert the raw neighbor list into a vector-of-vectors for easier access
     vector<vector<int>> neighborListVec(numOwnedPoints);
     int idx=0;
     for(int i=0;i<numOwnedPoints;++i)
@@ -255,9 +289,7 @@ void PDHE::computeForce(const double dt,
       idx += n;
     }
 
-    //Break all bonds along the initial crack face
-    std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
-    std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
+    //Sever initial crack bonds symmetrically, avoiding boundary nodes
     std::unordered_set<int> crackTopSet(crackTop.begin(), crackTop.end());
     std::unordered_set<int> crackBotSet(crackBottom.begin(), crackBottom.end());
     std::unordered_set<int> displacementBC;
@@ -270,7 +302,7 @@ void PDHE::computeForce(const double dt,
   for(int i=0; i<numOwnedPoints; ++i)
   {
     int g = ownedIDs[i];
-    // 💥 never sever ANY bond touching a BC node
+    // Not severing bonds attached to displacement BC nodes
     if(displacementBC.count(g))
       continue;
 
@@ -279,15 +311,18 @@ void PDHE::computeForce(const double dt,
     for(int n=0; n<(int)nbrs.size(); ++n)
     {
       int h = nbrs[n];
-    // 💥 skip if neighbor is a BC node
+    // Skip if neighbor is a BC node
       if(displacementBC.count(h))
         continue;
 
       bool top2bot = crackTopSet.count(g) && crackBotSet.count(h);
       bool bot2top = crackBotSet.count(g) && crackTopSet.count(h);
-      if(top2bot || bot2top){
-        bonds[n] = 0.0;  // sever here
-      // mirror-sever on the other side
+      if(top2bot || bot2top)
+      {
+        // Sever bond on both sides
+        bonds[n] = 0.0;
+
+        // mirror-sever on the other side
         auto it = globalToLocal.find(h);
         if(it != globalToLocal.end()){
           int j = it->second;
@@ -297,7 +332,7 @@ void PDHE::computeForce(const double dt,
           {
             if(nbrsJ[m] == g)
             {
-              bondsJ[m] = 0.0;  // 💥 and on mirror side
+              bondsJ[m] = 0.0;
               break;
             }
           }
@@ -306,7 +341,7 @@ void PDHE::computeForce(const double dt,
     }
   }
 
-
+  // Begin main load-step loop for mechanical and diffusion updates
   if(outFile.is_open())
   {
     cout << "PDHE simulation started... "<< endl << endl;
@@ -314,7 +349,7 @@ void PDHE::computeForce(const double dt,
     {
       cout << "Load steps: "<< i+1 << endl << endl;
         
-      // Displacement BC
+      // Apply prescribed displacement BCs on top and bottom nodes
       for(auto nodeID : myBoundaryNodes1)
       {
         if(i <= 1000)
@@ -347,23 +382,24 @@ void PDHE::computeForce(const double dt,
       if(i >= N)
         {outFile << "Load step: " << i << endl;}
 
+      // Hydrogen diffusion subcycling: N_h sub-steps per mechanical step
       for(int j=0; j < N_h ; j++)
       {
+        // Enforce saturated concentration at BC nodes
         for(auto nodeID : myBoundaryNodes3) 
-        {
-          old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
-        }
+        {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
+        // Loop over all points for element_routine_hydrogen
         int neighIndex = 0; // index into neighborhoodList
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
           int nodeID = ownedIDs[iID];
-
           double x = modelCoord[3*nodeID];
           double y = modelCoord[3*nodeID + 1];
           double Volume_i = volume[nodeID];
           elementroutinehydrogen output;
 
+          // Extract neighbor count and run hydrogen update
           int numNeighbors = neighborhoodList[neighIndex++];
           double concentration_nodeID = old_concentration[nodeID];
           output = element_routine_hydrogen(nodeID, modelCoord, x, y, neighborhoodList, neighIndex, numNeighbors, m_horizon, old_concentration, concentration_nodeID, time_step_size_EFM, dh, Volume_i, volume);
@@ -372,13 +408,13 @@ void PDHE::computeForce(const double dt,
             
         }
 
+        // Reapply Dirichlet BC for hydrogen in order to have saturated hydrogen concentration at crack nodes
         for(auto nodeID : myBoundaryNodes3) 
           { old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
       }
 
-          // 1) build UF
+      // Connectivity tracking: use UnionFind to cluster intact bonds
       UnionFind uf(numOwnedPoints);
-          // 2) unify only intact bonds
       int idx = 0;
       for(int iID=0; iID<numOwnedPoints; ++iID)
       {
@@ -395,92 +431,92 @@ void PDHE::computeForce(const double dt,
         }
         idx += nbors;
       }
-    // 3) sever any horizon pair in different UF sets
-// --- sever any horizon‐pair in different UF sets ---
+
+      // Sever bonds between different UF clusters (crack growth)
       idx = 0;
       for(int iID=0; iID<numOwnedPoints; ++iID)
       {
         int g = ownedIDs[iID];
         int nbors = neighborhoodList[idx++];
 
-  // 💥 skip entire BC node so none of its bonds get cut
-      if(displacementBC.count(g))
-      {
-        idx += nbors;
-        continue;
-      }
-
-      for(int n=0; n<nbors; ++n)
-      {
-        int h = neighborhoodList[idx + n];
-    // 💥 skip cutting any bond into a BC node
-        if(displacementBC.count(h))
-          {continue;}
-
-        auto it = globalToLocal.find(h);
-        if(it != globalToLocal.end() && uf.find(iID) != uf.find(it->second))
+        if(displacementBC.count(g))
         {
-          m_bondFactor[iID][n] = 0.0;  // sever here
-        // mirror‐sever on the other side
-          auto &nbrsJ = neighborListVec[it->second];
-          auto &bJ     = m_bondFactor[it->second];
-          for(int m=0; m<(int)nbrsJ.size(); ++m)
+          idx += nbors;
+          continue;
+        }
+
+        for(int n=0; n<nbors; ++n)
+        {
+          int h = neighborhoodList[idx + n];
+          if(displacementBC.count(h))
+            {continue;}
+
+          auto it = globalToLocal.find(h);
+          if(it != globalToLocal.end() && uf.find(iID) != uf.find(it->second))
           {
-            if(nbrsJ[m] == g)
+            // Break bond on both sides
+            m_bondFactor[iID][n] = 0.0;
+            auto &nbrsJ = neighborListVec[it->second];
+            auto &bJ     = m_bondFactor[it->second];
+            for(int m=0; m<(int)nbrsJ.size(); ++m)
             {
-              bJ[m] = 0.0;  // 💥 and mirror‐sever here
-              break;
+              if(nbrsJ[m] == g)
+              {
+                bJ[m] = 0.0;
+                break;
+              }
             }
           }
         }
+        idx += nbors;
       }
-      idx += nbors;
-    }
 
 
-
+    // Compute internal forces, damage, and effective stiffness K
     numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
     int neighIndex = 0; // index into neighborhoodList
     for(int iID=0; iID < numOwnedPoints; ++iID)
     {
       int nodeID = ownedIDs[iID];
       double Px; double Py;
-      double x = modelCoord[3*nodeID]; // x
-      double y = modelCoord[3*nodeID + 1]; // y
+      double x = modelCoord[3*nodeID];
+      double y = modelCoord[3*nodeID + 1];
       double Volume_i = volume[nodeID];
 
-      for(auto b : myBoundaryNodes3) 
-        {old_concentration[b] = m_Sat_Val_Hyd_Conc;}
+      /*for(auto b : myBoundaryNodes3) 
+        {old_concentration[b] = m_Sat_Val_Hyd_Conc;}*/
 
+      // If damage is high, clamp conc to increase hydrogen embrittlement
       if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
         {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
       int numNeighbors = neighborhoodList[neighIndex++];
       double concenctration_nodeID = old_concentration[nodeID];
 
+      // Zero out force and restore bonds for BC rows
       if(displacementBC.count(nodeID)) 
       {
         damage[iID] = 0.0;
-            // restore all bonds to “intact” on that row
         std::fill(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 1.0);
-            // zero out internal force if you like (optional)
         P[2*nodeID]     = 0.0;
         P[2*nodeID + 1] = 0.0;
-        // advance your neighIndex past this node’s neighbors
         neighIndex += numNeighbors;
         continue;
       }
 
+      // Call PD element routine to compute forces and updated bonds
       PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
       Px = pdResult.Px; Py = pdResult.Py; neighIndex = pdResult.neighindex; m_bondFactor[iID] = pdResult.bondFac;
+      P[2*nodeID] = Px /*+ body_force[nodeID]*/;
+      P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
 
+      // Update damage based on broken bonds
       double sum = std::accumulate(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 0.0);
       double dNew = 1.0 - sum/m_bondFactor[iID].size();
       damage[iID] = std::max(damage[iID], dNew);
 
-      P[2*nodeID] = Px /*+ body_force[nodeID]*/;
-      P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
 
+       // Compute local stiffness K for computing nodal displacements
       if(i == 0)
       {
         displacement_n_minus_one[2*nodeID] = 0.0;
@@ -496,7 +532,8 @@ void PDHE::computeForce(const double dt,
           K[2*nodeID] = -((P[2*nodeID] - old_force[2*nodeID])/lambda_ii)/(displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]);
           K[2*nodeID + 1] = -((P[2*nodeID + 1] - old_force[2*nodeID + 1])/lambda_ii)/(displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]);
         }
-
+      
+      // Accumulate for computing damping co-efficient
       numerator = numerator + (displacement[2*nodeID] * K[2*nodeID] * displacement[2*nodeID])
                             + (displacement[2*nodeID + 1] * K[2*nodeID + 1] * displacement[2*nodeID + 1]);
       denominator = denominator + (displacement[2*nodeID] * displacement[2*nodeID])
@@ -504,10 +541,12 @@ void PDHE::computeForce(const double dt,
 
     }
 
+    // Calculate damping co-efficient, force the damping co-efficient if it is met with the conditions
     double c_n = 2 * sqrt(numerator/denominator);
     if(c_n >= 2.0 || numerator < 0.0 || denominator <= 0.0)
       {c_n = 1.9;}
 
+    // Update displacements and coordinates using central-difference scheme
     for(int iID=0; iID < numOwnedPoints; ++iID)
     {
       int nodeID = ownedIDs[iID];
@@ -566,15 +605,20 @@ void PDHE::computeForce(const double dt,
       double x = modelCoord[3*nodeID];
       double y = modelCoord[3*nodeID + 1];
       
+      // Log results after capture threshold
       if(i >= N)
       {
-        outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;
+        outFile << x << " " << y << " " << 
+        displacement[2*nodeID + 1] << " " << 
+        old_concentration[nodeID] << " " << 
+        damage[nodeID] << endl;
       }
     }
     
     if(i >= N)
       {outFile << endl << endl;}
   }
+  // End load-step loop and indicate the path of the exported simulation file
   outFile.close();
   cout << "Data exported to " << outputPath << endl;
     
