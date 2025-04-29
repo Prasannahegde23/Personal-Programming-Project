@@ -55,7 +55,7 @@ namespace PeridigmNS {
     double m_horizon;
     int N_t;                          // No. of load steps
     int N_h;                          // No. of steps for hydrogen concentration
-    int N;                            // Capture and save the simulation frame from N load steps
+    int N;                            // To Capture and save the simulation frame from N load steps
 
     // Geometrical Parameters
     double m_h;                         // thickness

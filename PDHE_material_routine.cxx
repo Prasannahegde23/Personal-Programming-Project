@@ -9,7 +9,12 @@ using namespace std;
  
 double vector_magnitude(std::vector<double> &v)
 {
-    return sqrt((v[0]*v[0]) + (v[1]*v[1]));
+    double res = sqrt((v[0]*v[0]) + (v[1]*v[1]));
+    /* 
+    Used for Unit test:
+        cout << "Magnitude of xi: " << res << endl;
+    */
+    return res;
 }
 
 std::vector<double> addVectors(std::vector<double> &a, std::vector<double> &b)  
@@ -17,6 +22,12 @@ std::vector<double> addVectors(std::vector<double> &a, std::vector<double> &b)
     std::vector<double> result(2);
     for(int i=0; i<2; i++) 
     {result[i] = a[i] + b[i];}
+    /* 
+    Used for Unit test:
+        cout << "Result of vector: " << endl;
+        cout << "x " << result[0] << endl;
+        cout << "y " << result[1] << endl;
+    */
     return result;
 }
 
@@ -24,7 +35,7 @@ double material_routine_Hydrogen_conc(double mag_xi, double neighborVolume, doub
 {
     double C_dot;
 
-    if(mag_xi < 1e-8) 
+    if(mag_xi < 1e-3) 
     {C_dot = 0.0;}
 
     else
@@ -35,14 +46,6 @@ double material_routine_Hydrogen_conc(double mag_xi, double neighborVolume, doub
 PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n, double k_t, double mag_xi, double m_Sat_Val_Hyd_Conc, double m_Critic_Energy_Rel_Rate, int nodeID, int neighborID, int n, double concentration_nodeID, double concentration_neighborID, double m_min_grid_spacing, double Volume_i, double neighborVolume, std::vector<double> &b_d, std::vector<double> &eta, std::vector<double> &xi)
 {
     PDOutputs out;
-
-    /*if(mag_xi < 1e-140) 
-    {
-        out.PDforce_x = 0.0;
-        out.PDforce_y = 0.0;
-        out.bondVal = 0.0;
-        return out;
-    }*/
 
     std::vector<double> eta_n(2);
     std::vector<double> eta_t(2);
@@ -81,14 +84,8 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
         double Phi_i =  concentration_nodeID/m_Sat_Val_Hyd_Conc; // Hydrogen coverage of i
         double Phi_j =  concentration_neighborID/m_Sat_Val_Hyd_Conc; // Hydrogen coverage of j
         double Phi = 0.5 * (Phi_i + Phi_j);
-        //Phi = std::clamp(Phi, 0.0, 1.0);
         s_c0 = s_c0 * (1 - (1.0467*Phi) + (0.1687*pow(Phi,2)));
         Phi = std::clamp(Phi, 0.0, 1.0);
-        //s = s + 1.0;
-        //if(s>0.0)
-       //{cout << "Critical stretch with hydrogen coverage: " << s_c0 << endl;
-       //cout << "Stretch with hydrogen coverage: " << s << endl;}
-        
     }
 
 

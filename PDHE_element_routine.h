@@ -5,7 +5,6 @@ struct PDResult
 {
     double Px;
     double Py;
-    double damage;
     int neighindex;
     std::vector<double> bondFac;
 };

@@ -1,10 +1,10 @@
 #include <iostream>
 #include <vector>
-#include <cmath>  // or <math.h>
-#include <fstream>         // For file I/O
-#include <filesystem>      // For current_path()
+#include <cmath> 
+#include <fstream> 
+#include <filesystem> 
 #include <Teuchos_ParameterList.hpp>
-#include <algorithm> // For std::max_element
+#include <algorithm> 
 #include <unordered_set>
 #include <numeric> 
 #include "Peridigm_Field.hpp"
@@ -61,7 +61,6 @@ namespace PeridigmNS
     m_volumeFieldId = fieldManager.getFieldId(PeridigmField::ELEMENT, PeridigmField::SCALAR, PeridigmField::CONSTANT, "Volume");
     m_concentrationFieldId = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::SCALAR, PeridigmField::TWO_STEP, "Temperature");
     m_damageFieldId = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::SCALAR, PeridigmField::TWO_STEP, "Damage");
-    //m_displacementFieldID = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::VECTOR, PeridigmField::TWO_STEP, "Displacement");
     m_bodyForceFieldId = fieldManager.getFieldId(PeridigmField::NODE, PeridigmField::VECTOR, PeridigmField::CONSTANT, "Body_Force");
 
 
@@ -75,7 +74,6 @@ namespace PeridigmNS
     m_fieldIds.push_back(m_volumeFieldId);
     m_fieldIds.push_back(m_concentrationFieldId);
     m_fieldIds.push_back(m_damageFieldId);
-    //m_fieldIds.push_back(m_displacementFieldID);
     m_fieldIds.push_back(m_bodyForceFieldId);
   }
 
@@ -123,18 +121,13 @@ double PDHE::minGridSpacing() const
 {return m_min_grid_spacing;}
 
 std::vector<int> PDHE::FieldIds() const 
-{return m_fieldIds;} // Return the vector of field IDs that is used
+{return m_fieldIds;}
 
-// Added below to fulfill the pure virtual BulkModulus() and ShearModulus() from Material.hpp:  
-double PDHE::BulkModulus() const {
-  // Return a value or formula; here, just return 0.0 for demonstration.
-  return 0.0;
-}
+double PDHE::BulkModulus() const 
+{return 0.0;}
 
-double PDHE::ShearModulus() const {
-  // Return a value or formula; here, just return 0.0 for demonstration.
-  return 0.0;
-}
+double PDHE::ShearModulus() const 
+{return 0.0;}
 
 std::vector<int> readNodeSet(const std::string& fileName) 
 {
@@ -151,24 +144,24 @@ std::vector<int> readNodeSet(const std::string& fileName)
   {
     std::istringstream iss(line);
     int nodeID;
-    if (iss >> nodeID) {
-      nodeSet.push_back(nodeID);
-    }
+    if (iss >> nodeID) 
+      {nodeSet.push_back(nodeID);}
   }
   return nodeSet;
 }
 
 // Simple union-find 
-struct UnionFind {
+struct UnionFind 
+{
   std::vector<int> parent;
   UnionFind(int N) : parent(N) { std::iota(parent.begin(), parent.end(), 0); }
   int find(int i){ return parent[i]==i ? i : parent[i]=find(parent[i]); }
-  void unite(int i,int j){
+  void unite(int i,int j)
+  {
     i = find(i); j = find(j);
     if(i!=j) parent[j]=i;
   }
 };
-
 
 //---------------------------------------------------------------------------//
 // computeForce(): This is called by Peridigm to compute internal forces.
@@ -184,8 +177,6 @@ void PDHE::computeForce(const double dt,
     double *oldCoord;
     double *volume; 
     double *concentration;
-    //double *damage;
-    //double *displacement;
     double *body_force;
 
     // Access Field IDs with the IDs you grabbed in constructor
@@ -193,58 +184,34 @@ void PDHE::computeForce(const double dt,
     dataManager.getData(m_coordinatesFieldId,      PeridigmField::STEP_NP1)->ExtractView(&currentCoord);
     dataManager.getData(m_volumeFieldId,           PeridigmField::STEP_NONE)->ExtractView(&volume);
     dataManager.getData(m_concentrationFieldId,    PeridigmField::STEP_NP1)->ExtractView(&concentration);
-    //dataManager.getData(m_damageFieldId, PeridigmField::STEP_NP1)->ExtractView(&damage);
-    dataManager.getData(m_coordinatesFieldId, PeridigmField::STEP_N)->ExtractView(&oldCoord);
-    //dataManager.getData(m_displacementFieldID, PeridigmField::STEP_NP1)->ExtractView(&displacement);
-
+    dataManager.getData(m_coordinatesFieldId,      PeridigmField::STEP_N)->ExtractView(&oldCoord);
 
     string outputFileName = "Output.txt";
     fs::path currentDir = fs::current_path();
     fs::path outputPath = currentDir / outputFileName;
 
     ofstream outFile(outputPath, std::ios::out | std::ios::app);
-    //ofstream outFile(outputPath);
-    //double converted_Youngs_Modulus = m_Youngs_Modulus * 1000;     //  GPa to MPa
-    //double converted_GB_Diff_Coeff = m_GB_Diff_Coeff * 1e6;       // m2/s to mm2/s
-    //double m_Sat_Val_Hyd_Conc = m_Sat_Val_Hyd_Conc * 1e-6;
-    //double converted_density = m_density * 1e-6;
 
     double dh = (6 * m_GB_Diff_Coeff)/(M_PI * m_h * (pow(m_horizon,3))); // PD bond constant
     double c = (6 * m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1 - m_poissons_ratio)); // PD parameter
     double lambda_ii = 1.0;
 
     // Time steps size decleration
-    //double time_step_size_CDM = (sqrt(m_density / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
-    //double time_step_size_CDM = (sqrt(lambda_ii * 0.0001 / (m_Youngs_Modulus))) * 0.7 * (m_min_grid_spacing);
     double time_step_size_CDM = (sqrt(m_density * 0.0001 / (m_Youngs_Modulus))) * (m_min_grid_spacing);
-    //double time_step_size_EFM = (m_min_grid_spacing * m_min_grid_spacing) /(2 * converted_GB_Diff_Coeff);
     double time_step_size_EFM = (sqrt(m_density / (m_Youngs_Modulus))) * (m_min_grid_spacing);
-    //double time_step_size_ADR = 1.0;
 
     
     // Other variables decleration
-    //std::vector<std::vector<double>> m_bondFactor(numOwnedPoints); 
-    //double m_ii = (M_PI * m_horizon * m_horizon * m_h * c)*(time_step_size_ADR * time_step_size_ADR)/(20 * m_min_grid_spacing);
-
-    //std::vector<double> U_dot_n_minus_half(2*numOwnedPoints);
-    //std::vector<double> U_dot_n_plus_half(2*numOwnedPoints);
-
     std::vector<double> old_force(2*numOwnedPoints);
     std::vector<double> old_displacement(2*numOwnedPoints);
     std::vector<double> displacement_n_minus_one(2*numOwnedPoints);
-
-    //std::vector<double> M(3*numOwnedPoints);
+    std::vector<double> displacement(2*numOwnedPoints, 0.0);
+    std::vector<double> old_concentration(numOwnedPoints, 0.0);
     std::vector<double> P(2*numOwnedPoints);
     std::vector<double> K(2*numOwnedPoints);
-    //std::vector<double> M_inverse(2*numOwnedPoints);
-    //std::vector<double> coordinates(2*numOwnedPoints);
-    std::vector<double> displacement(2*numOwnedPoints, 0.0);
-    //std::vector<double> concentration(numOwnedPoints, 0.0);
-    std::vector<double> old_concentration(numOwnedPoints, 0.0);
-    //std::vector<double> damage(numOwnedPoints, 0.0);
-    
-
     double numerator, denominator;
+
+    //PD parameters
     double k_n = (6*m_Youngs_Modulus)/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
     double k_t = (6*m_Youngs_Modulus*(1-(3*m_poissons_ratio)))/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
 
@@ -261,13 +228,13 @@ void PDHE::computeForce(const double dt,
     std::unordered_map<int,int> globalToLocal;
     globalToLocal.reserve(numOwnedPoints);
     for(int iID = 0; iID < numOwnedPoints; ++iID)
-      globalToLocal[ ownedIDs[iID] ] = iID;
+      {globalToLocal[ ownedIDs[iID] ] = iID;}
 
-      
     std::vector<int> numNeighbors(numOwnedPoints);
     {
       int idx = 0;
-      for(int iID=0; iID<numOwnedPoints; ++iID){
+      for(int iID=0; iID<numOwnedPoints; ++iID)
+      {
         numNeighbors[iID] = neighborhoodList[idx++];
         idx += numNeighbors[iID];
       }
@@ -281,409 +248,336 @@ void PDHE::computeForce(const double dt,
 
     vector<vector<int>> neighborListVec(numOwnedPoints);
     int idx=0;
-    for(int i=0;i<numOwnedPoints;++i){
+    for(int i=0;i<numOwnedPoints;++i)
+    {
       int n = neighborhoodList[idx++];
       neighborListVec[i].assign(&neighborhoodList[idx], &neighborhoodList[idx+n]);
       idx += n;
     }
 
-    // --- NEW: break all bonds along the initial crack face ---
-  std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
-  std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
-  std::unordered_set<int> crackTopSet(crackTop.begin(), crackTop.end());
-  std::unordered_set<int> crackBotSet(crackBottom.begin(), crackBottom.end());
-  std::unordered_set<int> displacementBC;
-  for(auto id : myBoundaryNodes1) displacementBC.insert(id);
-  for(auto id : myBoundaryNodes2) displacementBC.insert(id);
-
-// --- after you've built globalToLocal and neighborListVec (vector<vector<int>> of neighbor IDs) ---
+    //Break all bonds along the initial crack face
+    std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
+    std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
+    std::unordered_set<int> crackTopSet(crackTop.begin(), crackTop.end());
+    std::unordered_set<int> crackBotSet(crackBottom.begin(), crackBottom.end());
+    std::unordered_set<int> displacementBC;
+    for(auto id : myBoundaryNodes1) 
+      {displacementBC.insert(id);}
+    for(auto id : myBoundaryNodes2) 
+      {displacementBC.insert(id);}
 
 // break all bonds along the initial crack face, _symmetrically_
-// --- break all bonds along the initial crack face, _symmetrically_ ---
-for(int i=0; i<numOwnedPoints; ++i){
-  int g = ownedIDs[i];
-  // 💥 never sever ANY bond touching a BC node
-  if(displacementBC.count(g))
-    continue;
-
-  auto &nbrs  = neighborListVec[i];
-  auto &bonds = m_bondFactor[i];
-  for(int n=0; n<(int)nbrs.size(); ++n){
-    int h = nbrs[n];
-    // 💥 skip if neighbor is a BC node
-    if(displacementBC.count(h))
+  for(int i=0; i<numOwnedPoints; ++i)
+  {
+    int g = ownedIDs[i];
+    // 💥 never sever ANY bond touching a BC node
+    if(displacementBC.count(g))
       continue;
 
-    bool top2bot = crackTopSet.count(g) && crackBotSet.count(h);
-    bool bot2top = crackBotSet.count(g) && crackTopSet.count(h);
-    if(top2bot || bot2top){
-      bonds[n] = 0.0;  // sever here
+    auto &nbrs  = neighborListVec[i];
+    auto &bonds = m_bondFactor[i];
+    for(int n=0; n<(int)nbrs.size(); ++n)
+    {
+      int h = nbrs[n];
+    // 💥 skip if neighbor is a BC node
+      if(displacementBC.count(h))
+        continue;
+
+      bool top2bot = crackTopSet.count(g) && crackBotSet.count(h);
+      bool bot2top = crackBotSet.count(g) && crackTopSet.count(h);
+      if(top2bot || bot2top){
+        bonds[n] = 0.0;  // sever here
       // mirror-sever on the other side
-      auto it = globalToLocal.find(h);
-      if(it != globalToLocal.end()){
-        int j = it->second;
-        auto &nbrsJ  = neighborListVec[j];
-        auto &bondsJ = m_bondFactor[j];
-        for(int m=0; m<(int)nbrsJ.size(); ++m){
-          if(nbrsJ[m] == g){
-            bondsJ[m] = 0.0;  // 💥 and on mirror side
-            break;
+        auto it = globalToLocal.find(h);
+        if(it != globalToLocal.end()){
+          int j = it->second;
+          auto &nbrsJ  = neighborListVec[j];
+          auto &bondsJ = m_bondFactor[j];
+          for(int m=0; m<(int)nbrsJ.size(); ++m)
+          {
+            if(nbrsJ[m] == g)
+            {
+              bondsJ[m] = 0.0;  // 💥 and on mirror side
+              break;
+            }
           }
         }
       }
     }
   }
-}
 
 
-    if(outFile.is_open())
+  if(outFile.is_open())
+  {
+    cout << "PDHE simulation started... "<< endl << endl;
+    for(int i=0; i < N_t ; i++)
     {
-      cout << "PDHE simulation started... "<< endl << endl;
-      for(int i=0; i < N_t ; i++)
+      cout << "Load steps: "<< i+1 << endl << endl;
+        
+      // Displacement BC
+      for(auto nodeID : myBoundaryNodes1)
       {
-        cout << "Load steps: "<< i+1 << endl << endl;
-        // Displacement BC
-        //outFile << "myBoundaryNodes1:" << endl;
-
-        for(auto nodeID : myBoundaryNodes1)
-        {
-          if(i <= 1000)
-          { 
-            displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = (2*1e-8)*i;
-          }
-          else
-          { 
-            displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = (2*1e-5);
-          }
-          /*displacement[2*nodeID] = 0.0;
-          displacement[2*nodeID + 1] = (2*1e-8)*i;*/
-          //outFile << "After oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
+        if(i <= 1000)
+        { 
+          displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = (2*1e-8)*i;
         }
-
-        for(auto nodeID : myBoundaryNodes2)
-        {
-          //outFile << "Before oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
-          
-          if(i <= 1000)
-          {
-            displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = -(2*1e-8)*i; 
-          }
-          else
-          {
-            displacement[2*nodeID] = 0.0;
-            displacement[2*nodeID + 1] = -(2*1e-5);
-          }
-          /*displacement[2*nodeID] = 0.0;
-          displacement[2*nodeID + 1] = -(2*1e-8)*i;*/
-          //outFile << "After oldCoord[3*nodeID + 1] " << oldCoord[3*nodeID + 1] << endl;
+        else
+        { 
+          displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = (2*1e-5);
         }
+      }
 
-        //Writing Load step number into text file
-        if(i >= N)
+      for(auto nodeID : myBoundaryNodes2)
+      {
+        if(i <= 1000)
+        {
+          displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = -(2*1e-8)*i; 
+        }
+        else
+        {
+          displacement[2*nodeID] = 0.0;
+          displacement[2*nodeID + 1] = -(2*1e-5);
+        }
+      }
+
+      //Writing Load step number into text file
+      if(i >= N)
         {outFile << "Load step: " << i << endl;}
 
-        for(int j=0; j < N_h ; j++)
+      for(int j=0; j < N_h ; j++)
+      {
+        for(auto nodeID : myBoundaryNodes3) 
         {
-          //cout << "Hydrogen steps: "<< j+1 << endl;
-
-          for(auto nodeID : myBoundaryNodes3) 
-          {
-            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
-          }
-
-          //outFile << "Hydrogen_step: " << j << endl;
-          int neighIndex = 0; // index into neighborhoodList
-          for(int iID=0; iID < numOwnedPoints; ++iID)
-          {
-            int nodeID = ownedIDs[iID];
-
-            //outFile << displacement[3*nodeID + 1] << endl;
-            double x = modelCoord[3*nodeID];
-            double y = modelCoord[3*nodeID + 1];
-            double Volume_i = volume[nodeID];
-            elementroutinehydrogen output;
-            //double time_step_size_EFM = (sqrt(converted_density* volume[nodeID]/ (converted_Youngs_Modulus))) * (m_min_grid_spacing);
-
-            int numNeighbors = neighborhoodList[neighIndex++];
-            double concentration_nodeID = old_concentration[nodeID];
-            output = element_routine_hydrogen(nodeID, modelCoord, x, y, neighborhoodList, neighIndex, numNeighbors, m_horizon, old_concentration, concentration_nodeID, time_step_size_EFM, dh, Volume_i, volume);
-            old_concentration[nodeID] = output.conc;
-            neighIndex = output.neighindex;
-            
-          }
-          for(auto nodeID : myBoundaryNodes3) 
-          {
-            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
-          }
-
-          //old_concentration.swap(new_concentration);
-          //outFile << endl << endl;
+          old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
         }
 
-          // 1) build UF
-          UnionFind uf(numOwnedPoints);
-          // 2) unify only intact bonds
-          int idx = 0;
-          for(int iID=0; iID<numOwnedPoints; ++iID){
-            int nbors = neighborhoodList[idx++];
-            for(int n=0; n<nbors; ++n){
-              int nbrGlobal = neighborhoodList[idx + n];
-              if(m_bondFactor[iID][n] > 0.0){
-                auto it = globalToLocal.find(nbrGlobal);
-                if(it != globalToLocal.end())
-                  uf.unite(iID, it->second);
-              }
-            }
-            idx += nbors;
-          }
-    // 3) sever any horizon pair in different UF sets
-// --- sever any horizon‐pair in different UF sets ---
-idx = 0;
-for(int iID=0; iID<numOwnedPoints; ++iID){
-  int g     = ownedIDs[iID];
-  int nbors = neighborhoodList[idx++];
-
-  // 💥 skip entire BC node so none of its bonds get cut
-  if(displacementBC.count(g)){
-    idx += nbors;
-    continue;
-  }
-
-  for(int n=0; n<nbors; ++n){
-    int h = neighborhoodList[idx + n];
-    // 💥 skip cutting any bond into a BC node
-    if(displacementBC.count(h))
-      continue;
-
-    auto it = globalToLocal.find(h);
-    if(it != globalToLocal.end() && uf.find(iID) != uf.find(it->second)){
-      m_bondFactor[iID][n] = 0.0;  // sever here
-      // mirror‐sever on the other side
-      auto &nbrsJ = neighborListVec[it->second];
-      auto &bJ     = m_bondFactor[it->second];
-      for(int m=0; m<(int)nbrsJ.size(); ++m){
-        if(nbrsJ[m] == g){
-          bJ[m] = 0.0;  // 💥 and mirror‐sever here
-          break;
-        }
-      }
-    }
-  }
-  idx += nbors;
-}
-
-
-
-        numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
-        //outFile << "Iteration: " << iter << endl;
         int neighIndex = 0; // index into neighborhoodList
         for(int iID=0; iID < numOwnedPoints; ++iID)
         {
           int nodeID = ownedIDs[iID];
 
-          //currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[3*nodeID];
-          //currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[3*nodeID + 1];
-          //currentCoord[3*nodeID + 2] = currentCoord[3*nodeID + 2] + displacement[3*nodeID + 2];
-          //if(i >= 900)
-          //{outFile << currentCoord[3*nodeID] << " " << currentCoord[3*nodeID + 1] << " " << displacement[3*nodeID + 1] << endl;} // if required damage value}
-          double Px; double Py;
-          double x = modelCoord[3*nodeID]; // x
-          double y = modelCoord[3*nodeID + 1]; // y
+          double x = modelCoord[3*nodeID];
+          double y = modelCoord[3*nodeID + 1];
           double Volume_i = volume[nodeID];
-
-          for(auto nodeID : myBoundaryNodes3) 
-          {
-            old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;
-          }
-
-          if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
-            {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+          elementroutinehydrogen output;
 
           int numNeighbors = neighborhoodList[neighIndex++];
-          double concenctration_nodeID = old_concentration[nodeID];
-
-          if(displacementBC.count(nodeID)) {
-            damage[iID] = 0.0;
-            // restore all bonds to “intact” on that row
-            std::fill(m_bondFactor[iID].begin(),
-                      m_bondFactor[iID].end(), 1.0);
-            // zero out internal force if you like (optional)
-            P[2*nodeID]     = 0.0;
-            P[2*nodeID + 1] = 0.0;
-            // advance your neighIndex past this node’s neighbors
-            neighIndex += numNeighbors;
-            continue;
-          }
-
-          PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
-          Px = pdResult.Px; Py = pdResult.Py; damage[iID] = pdResult.damage; neighIndex = pdResult.neighindex; m_bondFactor[iID] = pdResult.bondFac;
-
-          double sum = std::accumulate(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 0.0);
-          double dNew = 1.0 - sum/m_bondFactor[iID].size();
-          damage[iID] = std::max(damage[iID], dNew);
-
-          P[2*nodeID] = Px /*+ body_force[nodeID]*/;
-          P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
-
-          //if(i >= 0)
-          //{
-           // outFile << "P[2*nodeID]: " << P[2*nodeID] << endl;
-           // outFile << "P[2*nodeID + 1]: " << P[2*nodeID + 1] << endl;
-          //}
-         // outFile << endl;
-
-          // Adavptive dynamic relaxtaion method
-         /* M_inverse[2*nodeID] = (1/m_ii); // inverse matrix computation
-          M_inverse[2*nodeID + 1] = (1/m_ii);
-
-          if(i == 0)
-          {
-            U_dot_n_minus_half[2*nodeID] = 0.5 * M_inverse[2*nodeID] * P[2*nodeID]*time_step_size_CDM;
-            U_dot_n_minus_half[2*nodeID + 1] = 0.5 * M_inverse[2*nodeID + 1] * P[2*nodeID + 1]*time_step_size_CDM;
-
-            //coordinates[3*nodeID] = modelCoord[3*nodeID];
-            //coordinates[3*nodeID + 1] = modelCoord[3*nodeID + 1];
-            //coordinates[3*nodeID + 2] = modelCoord[3*nodeID + 2];
-          }
-
-          else
-          {
-            U_dot_n_minus_half[2*nodeID] = U_dot_n_plus_half[2*nodeID];
-            U_dot_n_minus_half[2*nodeID + 1] = U_dot_n_plus_half[2*nodeID + 1];
-          }*/
-
-
-          if(i == 0)
-            {
-              displacement_n_minus_one[2*nodeID] = 0.0;
-              displacement_n_minus_one[2*nodeID + 1] = 0.0;
-            }
-
-          if(((displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]) == 0.0))
-            {K[2*nodeID] = 0.0;}
-          else if(((displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]) == 0.0))
-            {K[2*nodeID + 1] = 0.0;}
-          else
-              {
-                K[2*nodeID] = -((P[2*nodeID] - old_force[2*nodeID])/lambda_ii)/(displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]);
-                K[2*nodeID + 1] = -((P[2*nodeID + 1] - old_force[2*nodeID + 1])/lambda_ii)/(displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]);
-              }
-
-          numerator = numerator + (displacement[2*nodeID] * K[2*nodeID] * displacement[2*nodeID])
-                                + (displacement[2*nodeID + 1] * K[2*nodeID + 1] * displacement[2*nodeID + 1]);
-          denominator = denominator + (displacement[2*nodeID] * displacement[2*nodeID])
-                                    + (displacement[2*nodeID + 1] * displacement[2*nodeID + 1]);
-
+          double concentration_nodeID = old_concentration[nodeID];
+          output = element_routine_hydrogen(nodeID, modelCoord, x, y, neighborhoodList, neighIndex, numNeighbors, m_horizon, old_concentration, concentration_nodeID, time_step_size_EFM, dh, Volume_i, volume);
+          old_concentration[nodeID] = output.conc;
+          neighIndex = output.neighindex;
+            
         }
-        //outFile << "numerator " << numerator << endl;
-        //outFile << "denominator " << denominator << endl;
-        double c_n = 2 * sqrt(numerator/denominator);
-        if(c_n >= 2.0 || numerator < 0.0 || denominator <= 0.0)
-          {c_n = 1.9;}
-        //outFile << "c_n : " << c_n << endl;
 
+        for(auto nodeID : myBoundaryNodes3) 
+          { old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+      }
 
-        for(int iID=0; iID < numOwnedPoints; ++iID)
+          // 1) build UF
+      UnionFind uf(numOwnedPoints);
+          // 2) unify only intact bonds
+      int idx = 0;
+      for(int iID=0; iID<numOwnedPoints; ++iID)
+      {
+        int nbors = neighborhoodList[idx++];
+        for(int n=0; n<nbors; ++n)
         {
-          int nodeID = ownedIDs[iID];
-          /*U_dot_n_plus_half[2*nodeID] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[2*nodeID]) +
-                           (2*time_step_size_CDM * M_inverse[2*nodeID] * P[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
-          U_dot_n_plus_half[2*nodeID + 1] = (((2 - (time_step_size_CDM * c_n)) * U_dot_n_minus_half[3*nodeID + 1]) +
-                           (2*time_step_size_CDM * M_inverse[2*nodeID + 1] * P[2*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
-
-          */
-
-         old_displacement[2*nodeID] = displacement[2*nodeID];
-         old_displacement[2*nodeID + 1] = displacement[2*nodeID + 1];
-
-          int flag = 0;
-          for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes1.size(); nodecheckID++)
+          int nbrGlobal = neighborhoodList[idx + n];
+          if(m_bondFactor[iID][n] > 0.0)
           {
-            if(nodeID == myBoundaryNodes1[nodecheckID])
+            auto it = globalToLocal.find(nbrGlobal);
+            if(it != globalToLocal.end())
+            uf.unite(iID, it->second);
+          }
+        }
+        idx += nbors;
+      }
+    // 3) sever any horizon pair in different UF sets
+// --- sever any horizon‐pair in different UF sets ---
+      idx = 0;
+      for(int iID=0; iID<numOwnedPoints; ++iID)
+      {
+        int g = ownedIDs[iID];
+        int nbors = neighborhoodList[idx++];
+
+  // 💥 skip entire BC node so none of its bonds get cut
+      if(displacementBC.count(g))
+      {
+        idx += nbors;
+        continue;
+      }
+
+      for(int n=0; n<nbors; ++n)
+      {
+        int h = neighborhoodList[idx + n];
+    // 💥 skip cutting any bond into a BC node
+        if(displacementBC.count(h))
+          {continue;}
+
+        auto it = globalToLocal.find(h);
+        if(it != globalToLocal.end() && uf.find(iID) != uf.find(it->second))
+        {
+          m_bondFactor[iID][n] = 0.0;  // sever here
+        // mirror‐sever on the other side
+          auto &nbrsJ = neighborListVec[it->second];
+          auto &bJ     = m_bondFactor[it->second];
+          for(int m=0; m<(int)nbrsJ.size(); ++m)
+          {
+            if(nbrsJ[m] == g)
             {
-              flag = 1;
+              bJ[m] = 0.0;  // 💥 and mirror‐sever here
               break;
             }
-
-            else
-              continue;
           }
+        }
+      }
+      idx += nbors;
+    }
 
-          for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes2.size(); nodecheckID++)
-          {
-            if(nodeID == myBoundaryNodes2[nodecheckID])
-            {
-              flag = 1;
-              break;
-            }
 
-            else
-              continue;
-          }
 
-          if(flag == 1)
-          {
-            currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
-            currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
-          }
-          
-          /*else
-          {
-            displacement[2*nodeID] = displacement[2*nodeID] + (time_step_size_CDM * U_dot_n_plus_half[2*nodeID]);
-            displacement[2*nodeID + 1] = displacement[2*nodeID + 1] + (time_step_size_CDM * U_dot_n_plus_half[2*nodeID + 1]);
+    numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
+    int neighIndex = 0; // index into neighborhoodList
+    for(int iID=0; iID < numOwnedPoints; ++iID)
+    {
+      int nodeID = ownedIDs[iID];
+      double Px; double Py;
+      double x = modelCoord[3*nodeID]; // x
+      double y = modelCoord[3*nodeID + 1]; // y
+      double Volume_i = volume[nodeID];
 
-            currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
-            currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
-          }*/
+      for(auto b : myBoundaryNodes3) 
+        {old_concentration[b] = m_Sat_Val_Hyd_Conc;}
 
-          else
-          {
-            //double time_step_size_CDM = (sqrt(converted_density* volume[nodeID]/ (converted_Youngs_Modulus))) * (m_min_grid_spacing);
+      if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
+        {old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
 
-            displacement[2*nodeID] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID]) + (4 * displacement[2*nodeID]) +
-                                    (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
-            displacement[2*nodeID + 1] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID + 1]) + (4 * displacement[2*nodeID + 1]) +
+      int numNeighbors = neighborhoodList[neighIndex++];
+      double concenctration_nodeID = old_concentration[nodeID];
+
+      if(displacementBC.count(nodeID)) 
+      {
+        damage[iID] = 0.0;
+            // restore all bonds to “intact” on that row
+        std::fill(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 1.0);
+            // zero out internal force if you like (optional)
+        P[2*nodeID]     = 0.0;
+        P[2*nodeID + 1] = 0.0;
+        // advance your neighIndex past this node’s neighbors
+        neighIndex += numNeighbors;
+        continue;
+      }
+
+      PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
+      Px = pdResult.Px; Py = pdResult.Py; neighIndex = pdResult.neighindex; m_bondFactor[iID] = pdResult.bondFac;
+
+      double sum = std::accumulate(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 0.0);
+      double dNew = 1.0 - sum/m_bondFactor[iID].size();
+      damage[iID] = std::max(damage[iID], dNew);
+
+      P[2*nodeID] = Px /*+ body_force[nodeID]*/;
+      P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
+
+      if(i == 0)
+      {
+        displacement_n_minus_one[2*nodeID] = 0.0;
+        displacement_n_minus_one[2*nodeID + 1] = 0.0;
+      }
+
+      if(((displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]) == 0.0))
+        {K[2*nodeID] = 0.0;}
+      else if(((displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]) == 0.0))
+        {K[2*nodeID + 1] = 0.0;}
+      else
+        {
+          K[2*nodeID] = -((P[2*nodeID] - old_force[2*nodeID])/lambda_ii)/(displacement[2*nodeID] - displacement_n_minus_one[2*nodeID]);
+          K[2*nodeID + 1] = -((P[2*nodeID + 1] - old_force[2*nodeID + 1])/lambda_ii)/(displacement[2*nodeID + 1] - displacement_n_minus_one[2*nodeID + 1]);
+        }
+
+      numerator = numerator + (displacement[2*nodeID] * K[2*nodeID] * displacement[2*nodeID])
+                            + (displacement[2*nodeID + 1] * K[2*nodeID + 1] * displacement[2*nodeID + 1]);
+      denominator = denominator + (displacement[2*nodeID] * displacement[2*nodeID])
+                                + (displacement[2*nodeID + 1] * displacement[2*nodeID + 1]);
+
+    }
+
+    double c_n = 2 * sqrt(numerator/denominator);
+    if(c_n >= 2.0 || numerator < 0.0 || denominator <= 0.0)
+      {c_n = 1.9;}
+
+    for(int iID=0; iID < numOwnedPoints; ++iID)
+    {
+      int nodeID = ownedIDs[iID];
+
+      old_displacement[2*nodeID] = displacement[2*nodeID];
+      old_displacement[2*nodeID + 1] = displacement[2*nodeID + 1];
+
+      int flag = 0;
+      for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes1.size(); nodecheckID++)
+      {
+        if(nodeID == myBoundaryNodes1[nodecheckID])
+        {
+          flag = 1;
+          break;
+        }
+
+        else
+          {continue;}
+      }
+
+      for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes2.size(); nodecheckID++)
+      {
+        if(nodeID == myBoundaryNodes2[nodecheckID])
+        {
+          flag = 1;
+          break;
+        }
+
+        else
+          {continue;}
+      }
+
+      if(flag == 1)
+      {
+        currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
+        currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
+      }
+
+      else
+      {
+        displacement[2*nodeID] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID]) + (4 * displacement[2*nodeID]) +
+                                (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
+        displacement[2*nodeID + 1] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID + 1]) + (4 * displacement[2*nodeID + 1]) +
                                     (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
 
-            currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
-            currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
-          }
-          old_force[2*nodeID] = P[2*nodeID];
-          old_force[2*nodeID + 1] = P[2*nodeID + 1];
-
-          displacement_n_minus_one[2*nodeID] = old_displacement[2*nodeID];
-          displacement_n_minus_one[2*nodeID + 1] = old_displacement[2*nodeID + 1];
-
-          double x = currentCoord[3*nodeID]; // x
-          double y = currentCoord[3*nodeID + 1]; // y
-          //double z = coordinates[3*nodeID + 2]; // z
-          //displacement[2*nodeID + 1] damage[nodeID]
-          if(i >= N)
-          {
-            /*for(auto b : myBoundaryNodes3) 
-            {
-              if(i <= 1000)
-            {
-              displacement[2*b + 1] = (2*1e-8)*i; 
-            }
-            else
-            {
-              displacement[2*nodeID + 1] = (2*1e-5);
-            }
-            }*/
-
-            outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;
-          } // if required damage value}
-          //cout << x << " " << y << " " << z << " " << y/*damage[nodeID]*/ << endl; // if required damage value
-        }
-        if(i >= N)
-        {outFile << endl << endl;}
+        currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
+        currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
       }
-      outFile.close();
-      cout << "Data exported to " << outputPath << endl;
+      
+      old_force[2*nodeID] = P[2*nodeID];
+      old_force[2*nodeID + 1] = P[2*nodeID + 1];
+
+      displacement_n_minus_one[2*nodeID] = old_displacement[2*nodeID];
+      displacement_n_minus_one[2*nodeID + 1] = old_displacement[2*nodeID + 1];
+
+      double x = modelCoord[3*nodeID];
+      double y = modelCoord[3*nodeID + 1];
+      
+      if(i >= N)
+      {
+        outFile << x << " " << y << " " << displacement[2*nodeID + 1] << " " << old_concentration[nodeID] << " " << damage[nodeID] << endl;
+      }
+    }
+    
+    if(i >= N)
+      {outFile << endl << endl;}
+  }
+  outFile.close();
+  cout << "Data exported to " << outputPath << endl;
+    
     }
   }
 }

@@ -14,6 +14,14 @@ std::vector<double> eta_vec(std::vector<double> &disp_of_center, std::vector<dou
     {
         result[i] = disp_of_j[i] - disp_of_center[i];
     }
+
+    /* 
+    Used for Unit test:
+        cout << "Eta vector: " << endl;
+        cout << "x " << result[0] << endl;
+        cout << "y " << result[1] << endl;
+    */
+
     return result;
 }
 
@@ -22,12 +30,25 @@ std::vector<double> xi_vec(double x, double y, double neigh_x, double neigh_y)
     std::vector<double> result(2);
     result[0] = neigh_x - x;
     result[1] = neigh_y - y;
+
+    /* 
+    Used for Unit test:
+        cout << "xi vector: " << endl;
+        cout << "x " << result[0] << endl;
+        cout << "y " << result[1] << endl;
+    */
+
     return result;
 }
 
-double mod_xi(const std::vector<double> &result)
+double mod_xi(const std::vector<double> &result) // Used for calculating magnitude of "xi" vector
 {
-    return sqrt((result[0]*result[0]) + (result[1]*result[1]));
+    double res = sqrt((result[0]*result[0]) + (result[1]*result[1]));
+    /* 
+    Used for Unit test:
+        cout << "Magnitude of xi: " << res << endl;
+    */
+    return res;
 }
 
 elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,double x, double y,const int *neighborhoodList, int neighIndex, int numNeighbors, double m_horizon, std::vector<double> &old_concentration, double concentration_nodeID, double time_step_size_EFM, double dh, double Volume_i, double *volume)
@@ -42,7 +63,6 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,d
         double neigh_x = modelCoord[3*neighborID];
         double neigh_y = modelCoord[3*neighborID + 1];
         
-
         std::vector<double> xi;
         xi =  xi_vec(x, y, neigh_x, neigh_y);
         double mag_xi = mod_xi(xi);
@@ -66,9 +86,7 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
     std::vector<double> disp_j(2);
     std::vector<double> eta(2); 
     std::vector<double> xi(2);
-    //std::vector<double> b_d(numNeighbors);
-    double damage_val = 0.0;
-    double Volume_j = 0.0;
+
     for(int n=0; n < numNeighbors; ++n)
     {
         int neighborID = neighborhoodList[neighIndex++];
@@ -84,7 +102,7 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         double dx = (modelCoord[3*neighborID] + disp_j[0]) - (x + disp_center[0]);
         double dy = (modelCoord[3*neighborID+1] + disp_j[1]) - (y + disp_center[1]);
         if(std::sqrt(dx*dx + dy*dy) > m_horizon || bondFactor[n]==0.0)
-          continue;  // permanently skip any broken or over-stretched pair
+          continue;
           
         eta = eta_vec(disp_center, disp_j);
         xi = xi_vec(x, y, neigh_x, neigh_y);
@@ -99,14 +117,10 @@ PDResult element_routine_PD(double Volume_i, double *volume, double c, double m_
         bondFactor[n] = out.bondVal;
         PD_force_i[0] = PD_force_i[0] + PD_force_i_j[0];
         PD_force_i[1] = PD_force_i[1] + PD_force_i_j[1];
-        
-        damage_val = damage_val + (bondFactor[n] * neighborVolume);
-        Volume_j = Volume_j + neighborVolume;
     }
 
     result.Px = PD_force_i[0];
     result.Py = PD_force_i[1];
-    result.damage = 1 - (damage_val)/(Volume_j);
     result.neighindex = neighIndex;
     result.bondFac = bondFactor;
 

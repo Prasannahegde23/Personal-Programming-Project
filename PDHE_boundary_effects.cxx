@@ -18,7 +18,6 @@ PDParameter surface_correction(double k_n, double k_t, double m_horizon, double 
 
 std::vector<double> volume_correction(std::vector<double> &PD_force, double m_horizon, double mag_xi, double m_min_grid_spacing, double nodeID, double neighborID)
 {   
-    // Should be implemented for all material points in the horizon
     double vol_corr_factor;
     double check = m_horizon - (m_min_grid_spacing/2);
     if (mag_xi < check)
