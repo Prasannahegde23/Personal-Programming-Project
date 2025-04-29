@@ -4,7 +4,7 @@
 #include "PDHE_element_routine.h" 
 #include "PDHE_material_routine.h"
 #include "PDHE_boundary_effects.h"
-  
+   
 using namespace std;
 
 // Computes relative displacement vector between two nodes
@@ -16,13 +16,6 @@ std::vector<double> eta_vec(std::vector<double> &disp_of_center, std::vector<dou
         result[i] = disp_of_j[i] - disp_of_center[i];
     }
 
-    // Used for Unit test:
-    /* 
-        cout << "Eta vector: " << endl;
-        cout << "x " << result[0] << endl;
-        cout << "y " << result[1] << endl;
-    */
-
     return result;
 }
 
@@ -33,13 +26,6 @@ std::vector<double> xi_vec(double x, double y, double neigh_x, double neigh_y)
     result[0] = neigh_x - x;
     result[1] = neigh_y - y;
 
-    // Used for Unit test:
-    /* 
-        cout << "xi vector: " << endl;
-        cout << "x " << result[0] << endl;
-        cout << "y " << result[1] << endl;
-    */
-
     return result;
 }
 
@@ -47,11 +33,6 @@ std::vector<double> xi_vec(double x, double y, double neigh_x, double neigh_y)
 double mod_xi(const std::vector<double> &result) // Used for calculating magnitude of "xi" vector
 {
     double res = sqrt((result[0]*result[0]) + (result[1]*result[1]));
-    
-    // Used for Unit test:
-    /* 
-        cout << "Magnitude of xi: " << res << endl;
-    */
     return res;
 }
 
@@ -60,20 +41,20 @@ double mod_xi(const std::vector<double> &result) // Used for calculating magnitu
 //                            hydrogen concentration at one node
 // Inputs:
 //   nodeID               - global ID of the current node
-//   modelCoord           - flattened array of undeformed coordinates [x0,y0,z0,...]
+//   modelCoord           - flattened array of undeformed coordinates
 //   x, y                 - undeformed position of this node
-//   neighborhoodList     - array: [numNbrs, nbrID1, nbrID2, ...]
+//   neighborhoodList     - neighborhood array
 //   neighIndex           - index into neighborhoodList where neighbor IDs start
 //   numNeighbors         - number of neighbors for this node
 //   m_horizon            - peridynamic horizon length
-//   old_concentration    - reference to vector holding concentrations at t^n
-//   concentration_nodeID - concentration at this node at t^n
+//   old_concentration    - reference to vector holding concentrations
+//   concentration_nodeID - concentration at current node
 //   time_step_size_EFM   - diffusion substep size
 //   dh                   - hydrogen diffusion bond constant
 //   Volume_i             - volume of this node
 //   volume               - pointer to volumes of all nodes
 // Outputs:
-//   finalresult.conc     - updated concentration at this node (t^{n+1})
+//   finalresult.conc     - updated concentration
 //   finalresult.neighindex - updated index after iterating neighbors
 //----------------------------------------------------------------------------//
 
@@ -130,11 +111,11 @@ elementroutinehydrogen element_routine_hydrogen(int nodeID, double *modelCoord,d
 //   displacement           - current displacements vector (size 2*N)
 //   old_concentration      - concentration vector at current time
 //   concentration_nodeID   - concentration at this node
-//   m_min_grid_spacing     - smallest cell spacing (for failure criterion)
-//   bondFactor             - vector of bond-intactness factors (0 to 1)
+//   m_min_grid_spacing     - smallest grid spacing
+//   bondFactor             - vector of bond factors (0 to 1)
 // Outputs:
 //   result.Px, result.Py   - summed internal force components on node
-//   result.bondFac         - updated bondFactor for this node
+//   result.bondFac         - updated bondFactor for current node
 //   result.neighindex      - updated neighbor index after loop
 //----------------------------------------------------------------------------//
 

@@ -64,6 +64,15 @@ namespace PeridigmNS
     m_h = params.get<double>("Thickness");
     m_min_grid_spacing = params.get<double>("Minimum grid spacing");
 
+    //Read File names
+    m_top_displacement = params.get<std::string>("File name for displacement in +ve x/y-direction");
+    m_bottom_displacement = params.get<std::string>("File name for displacement in -ve x/y-direction");
+    m_crack_top = params.get<std::string>("File name for crack top lip");
+    m_crack_bottom = params.get<std::string>("File name for crack bottom lip");
+    m_concentration_file = params.get<std::string>("File name for concentration");
+
+    BC_status = params.get<bool>("Boundary condition test"); // Used to capture status of boundary condition test
+
     //---------------------------------------------------------------------------//
     // In this section, all the fields are read from the FieldManager where all 
     // data fields are tracked in Peridigm
@@ -97,7 +106,7 @@ namespace PeridigmNS
 //---------------------------------------------------------------------------//
 
 std::string PDHE::Name() const 
-{return "PDHE";}                  // Returns anything that identifies your material in logs
+{return "PDHE";}
 
 double PDHE::YoungsModulus() const 
 {return m_Youngs_Modulus;}
@@ -143,6 +152,9 @@ double PDHE::BulkModulus() const
 
 double PDHE::ShearModulus() const 
 {return 0.0;}
+
+bool PDHE::BCtest() const 
+{return BC_status;}
 
 //---------------------------------------------------------------------------//
 // readNodeSet: Utility to load a list of node IDs from a text file       //
@@ -235,6 +247,7 @@ void PDHE::computeForce(const double dt,
     std::vector<double> displacement(2*numOwnedPoints, 0.0);
     std::vector<double> old_concentration(numOwnedPoints, 0.0);
     std::vector<double> P(2*numOwnedPoints);
+    std::vector<double> Reac_Force_bnd_nodes(2*numOwnedPoints, 0.0);
     std::vector<double> K(2*numOwnedPoints);
     double numerator, denominator;
 
@@ -243,11 +256,13 @@ void PDHE::computeForce(const double dt,
     double k_t = (6*m_Youngs_Modulus*(1-(3*m_poissons_ratio)))/(M_PI*m_h*pow(m_horizon,3)*(1-m_poissons_ratio));
 
     // Load boundary node sets: top displacement, bottom displacement, hydrogen BCs, crack nodeIds
-    std::vector<int> myBoundaryNodes1 = readNodeSet("nodeset_top.txt");
-    std::vector<int> myBoundaryNodes2 = readNodeSet("nodeset_bottom.txt");
-    std::vector<int> myBoundaryNodes3 = readNodeSet("nodeset_concentration.txt");
-    std::vector<int> crackTop = readNodeSet("nodeset_top_crack.txt");
-    std::vector<int> crackBottom = readNodeSet("nodeset_bottom_crack.txt");
+    
+    std::vector<int> myBoundaryNodes1 = readNodeSet(m_top_displacement);
+    std::vector<int> myBoundaryNodes2 = readNodeSet(m_bottom_displacement);
+    std::vector<int> myBoundaryNodes3 = readNodeSet(m_concentration_file);
+    std::vector<int> crackTop = readNodeSet(m_crack_top);
+    std::vector<int> crackBottom = readNodeSet(m_crack_bottom);
+
 
     // Initialize old_concentration from the field
     for(int iID=0; iID < numOwnedPoints; ++iID)
@@ -343,7 +358,21 @@ void PDHE::computeForce(const double dt,
 
   // Begin main load-step loop for mechanical and diffusion updates
   if(outFile.is_open())
-  {
+  { 
+    // Header for output file
+    if(BC_status == true)
+    {
+      outFile << "#Header"<< endl;
+      outFile << "nodeID value"<< endl << endl << endl;
+    }
+
+    else
+    {
+      outFile << "#Header"<< endl;
+      outFile << "nodeID Displacement(m) Hydrogen_concentration(mol/m^2) Damage Force_x(N) Force_y(N)"<< endl << endl;
+    }
+
+
     cout << "PDHE simulation started... "<< endl << endl;
     for(int i=0; i < N_t ; i++)
     {
@@ -379,7 +408,7 @@ void PDHE::computeForce(const double dt,
       }
 
       //Writing Load step number into text file
-      if(i >= N)
+      if(i % 60 == 0)
         {outFile << "Load step: " << i << endl;}
 
       // Hydrogen diffusion subcycling: N_h sub-steps per mechanical step
@@ -581,16 +610,19 @@ void PDHE::computeForce(const double dt,
 
       if(flag == 1)
       {
+        // If at all wanted for deformed configuration
         currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
         currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
+        Reac_Force_bnd_nodes[2*nodeID] = P[2*nodeID];
+        Reac_Force_bnd_nodes[2*nodeID + 1] = P[2*nodeID + 1];
       }
 
       else
       {
         displacement[2*nodeID] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID]) + (4 * displacement[2*nodeID]) +
-                                (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
+                                (((c_n*time_step_size_CDM) - 2) * displacement_n_minus_one[2*nodeID]))/(2 + (time_step_size_CDM*c_n));
         displacement[2*nodeID + 1] = ((2* time_step_size_CDM*time_step_size_CDM * P[2*nodeID + 1]) + (4 * displacement[2*nodeID + 1]) +
-                                    (((c_n*time_step_size_CDM) -2) * displacement_n_minus_one[2*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
+                                    (((c_n*time_step_size_CDM) - 2) * displacement_n_minus_one[2*nodeID + 1]))/(2 + (time_step_size_CDM*c_n));
 
         currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
         currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
@@ -606,19 +638,54 @@ void PDHE::computeForce(const double dt,
       double y = modelCoord[3*nodeID + 1];
       
       // Log results after capture threshold
-      if(i >= N)
+
+      // Will be used for boundary condition test
+      if(BC_status == true && i >= N)
       {
-        outFile << x << " " << y << " " << 
-        displacement[2*nodeID + 1] << " " << 
-        old_concentration[nodeID] << " " << 
-        damage[nodeID] << endl;
+        for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes1.size(); nodecheckID++)
+        {
+
+          if(nodeID == myBoundaryNodes1[nodecheckID])
+          {
+            outFile << "Check for Displacement boundary condition in m" << endl;
+            outFile << nodeID << " " << displacement[2*nodeID + 1] << endl;
+            break;
+          }
+          else
+            {continue;}
+        }
+
+        for(std::size_t nodecheckID = 0; nodecheckID < myBoundaryNodes3.size(); nodecheckID++)
+        {
+          if(nodeID == myBoundaryNodes3[nodecheckID])
+          {
+            outFile << "Check for Concentration boundary condition in mol/m^2" << endl;
+            outFile << nodeID << " " << old_concentration[nodeID] << endl << endl;
+            break;
+          }
+          else
+            {continue;}
+        }
+      }
+
+      else
+      {
+        if(i % 60 == 0)
+        {
+          outFile << x << " " << y << " " << 
+          displacement[2*nodeID + 1] << " " << 
+          old_concentration[nodeID] << " " << 
+          damage[nodeID] << " " <<
+          Reac_Force_bnd_nodes[2*nodeID] << " " <<
+          Reac_Force_bnd_nodes[2*nodeID + 1] << endl;
+        }
       }
     }
     
-    if(i >= N)
+    if(i % 60 == 0)
       {outFile << endl << endl;}
   }
-  // End load-step loop and indicate the path of the exported simulation file
+  // End load-step loop and indicate the path of the exported simulation
   outFile.close();
   cout << "Data exported to " << outputPath << endl;
     

@@ -13,7 +13,7 @@ namespace PeridigmNS {
     PDHE(const Teuchos::ParameterList& params);
 
     // Destructor
-    virtual ~PDHE(){}
+    virtual ~PDHE(){} 
 
     // These override the pure virtual methods in Material:
     virtual std::string Name() const;
@@ -29,6 +29,8 @@ namespace PeridigmNS {
     virtual int Captureloadsteps() const;
     virtual double h() const;
     virtual double minGridSpacing() const;
+    virtual bool BCtest() const;
+    
 
     virtual std::vector<int> FieldIds() const;
 
@@ -71,6 +73,15 @@ namespace PeridigmNS {
 
     // List of all field IDs
     std::vector<int> m_fieldIds;
+
+    // List of file names
+    std::string m_top_displacement;
+    std::string m_bottom_displacement;
+    std::string m_crack_top;
+    std::string m_crack_bottom;
+    std::string m_concentration_file;
+
+    bool BC_status; // Used to access for Boundary condition test
 
     mutable std::vector<std::vector<double>> m_bondFactor;
     mutable std::vector<double> damage;

@@ -9,7 +9,7 @@ using namespace std;
 // surface_correction:
 // Inputs:
 //   k_n        - nominal normal bond stiffness
-//   k_t        - nominal tangential bond stiffness
+//   k_t        - nominal tangential bond stiffness 
 //   m_horizon  - peridynamic horizon length
 //   V_i, V_j   - volumes of the interacting nodes i and j
 //   m_h        - thickness of the material (used to compute reference volume)
@@ -40,7 +40,7 @@ PDParameter surface_correction(double k_n, double k_t, double m_horizon, double 
 //   Modified PD_force vector after volume correction
 //----------------------------------------------------------------------------//
 
-std::vector<double> volume_correction(std::vector<double> &PD_force, double m_horizon, double mag_xi, double m_min_grid_spacing, double nodeID, double neighborID)
+std::vector<double> volume_correction(std::vector<double> &PD_force, double m_horizon, double mag_xi, double m_min_grid_spacing)
 {   
     double vol_corr_factor;
     double check = m_horizon - (m_min_grid_spacing/2);

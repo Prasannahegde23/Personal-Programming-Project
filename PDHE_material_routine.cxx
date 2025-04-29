@@ -7,16 +7,10 @@
  
 using namespace std;
 
-// Computes magnitude of 2D vector
+// Computes magnitude of 2D vector 
 double vector_magnitude(std::vector<double> &v)
 {
     double res = sqrt((v[0]*v[0]) + (v[1]*v[1]));
-    
-    // Used for Unit test:
-    /* 
-    Used for Unit test:
-        cout << "Magnitude of xi: " << res << endl;
-    */
     return res;
 }
 
@@ -27,12 +21,6 @@ std::vector<double> addVectors(std::vector<double> &a, std::vector<double> &b)
     for(int i=0; i<2; i++) 
     {result[i] = a[i] + b[i];}
     
-    // Used for Unit test:
-    /* 
-        cout << "Result of vector: " << endl;
-        cout << "x " << result[0] << endl;
-        cout << "y " << result[1] << endl;
-    */
     return result;
 }
 
@@ -128,7 +116,6 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
         Phi = std::clamp(Phi, 0.0, 1.0);
     }
 
-
     // Scalar factor b_d which determines bond breakage
     if (s >= s_c0 || b_d[n] == 0.0)
     {
@@ -139,7 +126,7 @@ PDOutputs material_routine_PD(double c, double m_h, double m_horizon, double k_n
     else 
     {
         bond_factor = 1.0;
-        PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing, nodeID, neighborID);
+        PD_force = volume_correction(PD_force, m_horizon, mag_xi, m_min_grid_spacing);
     }
 
     out.PDforce_x = PD_force[0];
