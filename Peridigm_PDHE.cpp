@@ -369,14 +369,14 @@ void PDHE::computeForce(const double dt,
     else
     {
       outFile << "#Header"<< endl;
-      outFile << "nodeID Displacement(m) Hydrogen_concentration(mol/m^2) Damage Force_x(N) Force_y(N)"<< endl << endl;
+      outFile << "x y Displacement(m) Hydrogen_concentration(mol/m^2) Damage"<< endl << endl;
     }
 
 
     cout << "PDHE simulation started... "<< endl << endl;
-    for(int i=0; i < N_t ; i++)
+    for(int i=0; i < N_t+1 ; i++)
     {
-      cout << "Load steps: "<< i+1 << endl << endl;
+      cout << "Load steps: "<< i << endl << endl;
         
       // Apply prescribed displacement BCs on top and bottom nodes
       for(auto nodeID : myBoundaryNodes1)
@@ -408,7 +408,7 @@ void PDHE::computeForce(const double dt,
       }
 
       //Writing Load step number into text file
-      if(i % 60 == 0)
+      if(i % 100 == 0)
         {outFile << "Load step: " << i << endl;}
 
       // Hydrogen diffusion subcycling: N_h sub-steps per mechanical step
@@ -438,8 +438,8 @@ void PDHE::computeForce(const double dt,
         }
 
         // Reapply Dirichlet BC for hydrogen in order to have saturated hydrogen concentration at crack nodes
-        for(auto nodeID : myBoundaryNodes3) 
-          { old_concentration[nodeID] = m_Sat_Val_Hyd_Conc;}
+        for(auto b : myBoundaryNodes3) 
+          {old_concentration[b] = m_Sat_Val_Hyd_Conc;}
       }
 
       // Connectivity tracking: use UnionFind to cluster intact bonds
@@ -511,9 +511,6 @@ void PDHE::computeForce(const double dt,
       double x = modelCoord[3*nodeID];
       double y = modelCoord[3*nodeID + 1];
       double Volume_i = volume[nodeID];
-
-      /*for(auto b : myBoundaryNodes3) 
-        {old_concentration[b] = m_Sat_Val_Hyd_Conc;}*/
 
       // If damage is high, clamp conc to increase hydrogen embrittlement
       if(old_concentration[nodeID] > 0.0 && damage[nodeID] >= 0.36)
@@ -613,8 +610,6 @@ void PDHE::computeForce(const double dt,
         // If at all wanted for deformed configuration
         currentCoord[3*nodeID] = currentCoord[3*nodeID] + displacement[2*nodeID];
         currentCoord[3*nodeID + 1] = currentCoord[3*nodeID + 1] + displacement[2*nodeID + 1];
-        Reac_Force_bnd_nodes[2*nodeID] = P[2*nodeID];
-        Reac_Force_bnd_nodes[2*nodeID + 1] = P[2*nodeID + 1];
       }
 
       else
@@ -670,19 +665,17 @@ void PDHE::computeForce(const double dt,
 
       else
       {
-        if(i % 60 == 0)
+        if(i % 100 == 0)
         {
           outFile << x << " " << y << " " << 
           displacement[2*nodeID + 1] << " " << 
           old_concentration[nodeID] << " " << 
-          damage[nodeID] << " " <<
-          Reac_Force_bnd_nodes[2*nodeID] << " " <<
-          Reac_Force_bnd_nodes[2*nodeID + 1] << endl;
+          damage[nodeID] << endl;
         }
       }
     }
     
-    if(i % 60 == 0)
+    if(i % 100 == 0)
       {outFile << endl << endl;}
   }
   // End load-step loop and indicate the path of the exported simulation
