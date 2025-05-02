@@ -12,6 +12,7 @@
 #include "Peridigm_PDHE.hpp"
 #include "Peridigm_DataManager.hpp" 
 #include "PDHE_element_routine.h"
+#include "PDHE_timing.hpp"
   
 using namespace std;
 namespace fs = std::filesystem;
@@ -374,6 +375,7 @@ void PDHE::computeForce(const double dt,
 
 
     cout << "PDHE simulation started... "<< endl << endl;
+    ScopedTimer loadTimer("Load_step_loop");
     for(int i=0; i < N_t+1 ; i++)
     {
       cout << "Load steps: "<< i << endl << endl;
@@ -408,10 +410,11 @@ void PDHE::computeForce(const double dt,
       }
 
       //Writing Load step number into text file
-      if(i % 100 == 0)
+      if(i >= N)
         {outFile << "Load step: " << i << endl;}
 
       // Hydrogen diffusion subcycling: N_h sub-steps per mechanical step
+      ScopedTimer hTimer("Hydrogen_subcycle");
       for(int j=0; j < N_h ; j++)
       {
         // Enforce saturated concentration at BC nodes
@@ -502,6 +505,7 @@ void PDHE::computeForce(const double dt,
 
 
     // Compute internal forces, damage, and effective stiffness K
+    ScopedTimer mTimer("Mechanical_PD");
     numerator = 0.0; denominator = 0.0; // Variables used for simplication of calculation
     int neighIndex = 0; // index into neighborhoodList
     for(int iID=0; iID < numOwnedPoints; ++iID)
@@ -573,6 +577,7 @@ void PDHE::computeForce(const double dt,
       {c_n = 1.9;}
 
     // Update displacements and coordinates using central-difference scheme
+    ScopedTimer dispalcement_timing("Displacement");
     for(int iID=0; iID < numOwnedPoints; ++iID)
     {
       int nodeID = ownedIDs[iID];
@@ -665,7 +670,7 @@ void PDHE::computeForce(const double dt,
 
       else
       {
-        if(i % 100 == 0)
+        if(i >= N)
         {
           outFile << x << " " << y << " " << 
           displacement[2*nodeID + 1] << " " << 
@@ -675,13 +680,16 @@ void PDHE::computeForce(const double dt,
       }
     }
     
-    if(i % 100 == 0)
+    if(i >= N)
       {outFile << endl << endl;}
   }
   // End load-step loop and indicate the path of the exported simulation
   outFile.close();
-  cout << "Data exported to " << outputPath << endl;
+  cout << endl << endl;
+  cout << "Data exported to " << outputPath << endl << endl;
     
     }
+    ScopedTimer::report();
+    cout << endl << endl;
   }
 }
