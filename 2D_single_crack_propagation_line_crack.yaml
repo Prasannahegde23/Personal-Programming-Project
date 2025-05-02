@@ -10,7 +10,7 @@ Peridigm:
     My Material:
       Material Model: "PDHE"
       Young's Modulus: 2.07e11
-      Grain boundary diffusion coefficient: 0.89e-9
+      Grain boundary diffusion coefficient: 0.84e-9
       Saturated value of hydrogen concentration: 2.65e-5
       Critical energy release rate: 16476.135
       Density: 8.0
@@ -19,7 +19,13 @@ Peridigm:
       No. of steps for hydrogen concentration: 20
       Thickness: 4.0e-3
       Minimum grid spacing: 1.0e-3
-      Capture and save the simulation frame from N load steps: 2990
+      Capture and save the simulation frame from N load steps: 3000
+      File name for displacement in +ve x/y-direction: "nodeset_top.txt"
+      File name for displacement in -ve x/y-direction: "nodeset_bottom.txt"
+      File name for crack top lip: "nodeset_bottom_crack.txt"
+      File name for crack bottom lip: "nodeset_top_crack.txt"
+      File name for concentration: "nodeset_concentration.txt"
+      Boundary condition test: false
 
   Blocks:
     My block:
@@ -28,12 +34,10 @@ Peridigm:
       Horizon: 5e-3
 
   Boundary Conditions:
-    Node Set One: "nodeset_top.txt"
-    Node Set Two: "nodeset_bottom.txt"
-    Node Set Three: "nodeset_concentration.txt"
+    Node Set One: "nodeset_concentration.txt"
     Hydrogen Concentration on Surface:
       Type: "Prescribed Temperature"
-      Node Set: "Node Set Three"
+      Node Set: "Node Set One"
       Value: 2.65e-5
 
 
@@ -48,7 +52,7 @@ Peridigm:
 
   Output:
     Output File Type: "ExodusII"
-    Output Filename: "single_crack_propagation"
+    Output Filename: "Dummy_exodus_file_not_to_be_used"
     Output Frequency: 1
     Output Variables:
         Displacement: true

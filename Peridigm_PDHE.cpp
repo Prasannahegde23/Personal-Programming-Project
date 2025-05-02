@@ -215,7 +215,6 @@ void PDHE::computeForce(const double dt,
     double *oldCoord;
     double *volume; 
     double *concentration;
-    double *body_force;
 
     // Access Field IDs with the IDs that were grabbed in constructor
     dataManager.getData(m_modelCoordinatesFieldId, PeridigmField::STEP_NONE)->ExtractView(&modelCoord);
@@ -248,7 +247,6 @@ void PDHE::computeForce(const double dt,
     std::vector<double> displacement(2*numOwnedPoints, 0.0);
     std::vector<double> old_concentration(numOwnedPoints, 0.0);
     std::vector<double> P(2*numOwnedPoints);
-    std::vector<double> Reac_Force_bnd_nodes(2*numOwnedPoints, 0.0);
     std::vector<double> K(2*numOwnedPoints);
     double numerator, denominator;
 
@@ -375,7 +373,6 @@ void PDHE::computeForce(const double dt,
 
 
     cout << "PDHE simulation started... "<< endl << endl;
-    ScopedTimer loadTimer("Load_step_loop");
     for(int i=0; i < N_t+1 ; i++)
     {
       cout << "Load steps: "<< i << endl << endl;
@@ -537,8 +534,8 @@ void PDHE::computeForce(const double dt,
       // Call PD element routine to compute forces and updated bonds
       PDResult pdResult = element_routine_PD(Volume_i, volume, c, m_h, m_horizon, k_n, k_t, m_Sat_Val_Hyd_Conc, m_Critic_Energy_Rel_Rate, modelCoord, x, y, nodeID, neighborhoodList, neighIndex, numNeighbors, displacement, old_concentration, concenctration_nodeID, m_min_grid_spacing, m_bondFactor[iID]/*, outFile*/);
       Px = pdResult.Px; Py = pdResult.Py; neighIndex = pdResult.neighindex; m_bondFactor[iID] = pdResult.bondFac;
-      P[2*nodeID] = Px /*+ body_force[nodeID]*/;
-      P[2*nodeID + 1] = Py /*+ body_force[nodeID + 1]*/;
+      P[2*nodeID] = Px;
+      P[2*nodeID + 1] = Py;
 
       // Update damage based on broken bonds
       double sum = std::accumulate(m_bondFactor[iID].begin(), m_bondFactor[iID].end(), 0.0);
@@ -688,7 +685,8 @@ void PDHE::computeForce(const double dt,
   cout << endl << endl;
   cout << "Data exported to " << outputPath << endl << endl;
     
-    }
+  }
+    // Log timings
     ScopedTimer::report();
     cout << endl << endl;
   }

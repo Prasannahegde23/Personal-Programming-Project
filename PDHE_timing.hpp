@@ -31,9 +31,14 @@ struct ScopedTimer
     std::lock_guard<std::mutex> l(mtx);
     std::cout << "\n=== Timing Summary ===\n";
     for(auto &p : acc)
-      std::cout << p.first
-                << std::string(20 - p.first.length(), ' ')
+      std::cout << std::setw(20) << std::left << p.first
                 << ": " << p.second << " s\n";
+
+    double h = acc["Hydrogen_subcycle"];
+    double m = acc["Mechanical_PD"];
+    double d = acc["Displacement"];
+    std::cout << std::setw(20) << std::left << "Total_time"
+              << ": " << (h + m + d) << " s\n";
   }
 };
 
