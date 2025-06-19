@@ -1,0 +1,58 @@
+Peridigm:
+
+  Verbose: false
+
+  Discretization:
+    Type: "Text File"
+    Input Mesh File: "4000_nodes.txt"
+
+  Materials:
+    My Material:
+      Material Model: "PDHE"
+      Young's Modulus: 2.07e11
+      Grain boundary diffusion coefficient: 0.89e-9
+      Saturated value of hydrogen concentration: 2.65e-5
+      Critical energy release rate: 16476.135
+      Density: 8.0
+      Poisson's ratio: 0.29
+      No. of load steps: 3000
+      No. of steps for hydrogen concentration: 20
+      Thickness: 4.0e-3
+      Minimum grid spacing: 2.22e-3
+      Capture and save the simulation frame from N load steps: 3000
+      File name for displacement in +ve x/y-direction: "nodeset_top.txt"
+      File name for displacement in -ve x/y-direction: "nodeset_bottom.txt"
+      File name for crack top lip: "nodeset_bottom_crack.txt"
+      File name for crack bottom lip: "nodeset_top_crack.txt"
+      File name for concentration: "nodeset_concentration.txt"
+      Boundary condition test: false
+
+  Blocks:
+    My block:
+      Block Names: "block_0"
+      Material: "My Material"
+      Horizon: 5e-3
+
+  Boundary Conditions:
+    Node Set One: "nodeset_concentration.txt"
+    Hydrogen Concentration on Surface:
+      Type: "Prescribed Temperature"
+      Node Set: "Node Set One"
+      Value: 2.65e-5
+
+
+  Solver:
+    Verbose: false
+    Initial Time: 0.0
+    Final Time: 1.0
+    QuasiStatic:
+      Number of Load Steps: 1
+      Absolute Tolerance: 1.0
+      Maximum Solver Iterations: 10
+
+  Output:
+    Output File Type: "ExodusII"
+    Output Filename: "Dummy_exodus_file_not_to_be_used"
+    Output Frequency: 1
+    Output Variables:
+        Displacement: true
