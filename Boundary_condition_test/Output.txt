@@ -1,0 +1,18 @@
+#Header
+nodeID value
+
+Check for Concentration boundary condition in mol/m^2
+1 2.65e-05
+
+Check for Concentration boundary condition in mol/m^2
+2 2.65e-05
+
+Check for Displacement boundary condition in m
+3 2e-08
+Check for Concentration boundary condition in mol/m^2
+3 2.65e-05
+
+Check for Displacement boundary condition in m
+4 2e-08
+Check for Displacement boundary condition in m
+5 2e-08
