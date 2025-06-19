@@ -1,0 +1,13 @@
+Following content should be stored in your ~/.bashrc or ~/.zshrc file:
+
+
+export SOFTWARE_DIR=$HOME/software
+export PATH=$SOFTWARE_DIR/bin:$PATH
+export LD_LIBRARY_PATH=$SOFTWARE_DIR/lib:$LD_LIBRARY_PATH
+export PATH=$SOFTWARE_DIR/bin:$PATH
+export LD_LIBRARY_PATH=$SOFTWARE_DIR/lib:$LD_LIBRARY_PATH
+module add peridigm/openmpi/gcc/11.4.0/master-12-24
+module load libyaml/gcc/11.4.0/0.2.5
+module load yaml-cpp/yaml-cpp/gcc/11.4.0/0.7.0
+export PATH=~/peridigm/install/bin:$PATH
+export LD_LIBRARY_PATH=~/Peridigm/install/lib:$LD_LIBRARY_PATH
